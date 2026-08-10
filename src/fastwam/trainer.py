@@ -618,6 +618,51 @@ class Wan22Trainer:
 
         return {"weights_path": ckpt_path, "state_path": state_path}
 
+    def _resync_scheduler_to_global_step(self):
+        """Re-synchronize the LR scheduler's position after a directory resume.
+
+        `accelerator.load_state()` restores the scheduler's raw internal step
+        counter from the checkpoint. That counter is only meaningful if the
+        schedule's shape (total_train_steps/warmup_steps, derived from
+        `self.max_steps`) is unchanged from when it was saved. If `max_steps`
+        was overridden to extend training (the whole point of a directory
+        resume for "train longer"), `__init__` already built a *new* schedule
+        shaped for the new total, and the counter accelerate just restored
+        belongs to the *old* shape -- reusing it directly reinterprets that
+        raw position against the wrong boundaries, producing a nonsensical LR
+        trajectory (observed in experiment 0007: LR re-warmed from near-zero
+        back up to the original peak instead of continuing its decay).
+
+        Fix: rebuild a scheduler in the *current* shape and advance it
+        step-by-step to `self.global_step`. This is well-defined regardless of
+        whether the shape changed, and is a no-op-equivalent (reproduces the
+        same trajectory accelerate would have restored) when `max_steps` is
+        unchanged, since scheduler math is deterministic.
+        """
+        total_train_steps = max(int(self.max_steps), 1)
+        warmup_steps = int(total_train_steps * 0.05)
+        correct_scheduler = self._build_scheduler(
+            scheduler_type=self.cfg.lr_scheduler_type,
+            total_train_steps=total_train_steps,
+            warmup_steps=warmup_steps,
+        )
+        for _ in range(self.global_step):
+            correct_scheduler.step()
+        underlying = getattr(self.scheduler, "scheduler", self.scheduler)
+        underlying.load_state_dict(correct_scheduler.state_dict())
+        # load_state_dict() only restores the scheduler's own bookkeeping; push
+        # the corrected LR into the optimizer's param groups explicitly, since
+        # that normally only happens as a side effect of calling `.step()`.
+        for group, lr in zip(self.optimizer.param_groups, underlying.get_last_lr()):
+            group["lr"] = lr
+        logger.info(
+            "Re-synchronized LR scheduler to global_step=%d (shape: total_train_steps=%d, warmup_steps=%d); lr=%.4e",
+            self.global_step,
+            total_train_steps,
+            warmup_steps,
+            underlying.get_last_lr()[0],
+        )
+
     def load_training_state(self, state_dir: str):
         self.accelerator.load_state(input_dir=state_dir)
         state_file = Path(state_dir) / "trainer_state.json"
@@ -625,6 +670,7 @@ class Wan22Trainer:
             with open(state_file, "r", encoding="utf-8") as f:
                 payload = json.load(f)
             self.global_step = int(payload["global_step"])
+            self._resync_scheduler_to_global_step()
 
             if "epoch" in payload and "batch_in_epoch" in payload:
                 self.epoch = int(payload["epoch"])
@@ -653,6 +699,7 @@ class Wan22Trainer:
             self.global_step = int(match.group(1))
         else:
             self.global_step = 0
+        self._resync_scheduler_to_global_step()
         self.epoch = 0
         self.batch_in_epoch = 0
         self.train_sampler.clear_resume_batch_offset()
