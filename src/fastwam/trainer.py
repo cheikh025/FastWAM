@@ -117,6 +117,23 @@ class Wan22Trainer:
         ensure_dir(self.state_dir)
         ensure_dir(self.eval_dir)
 
+        # Load a weights-only resume checkpoint BEFORE accelerator.prepare() wraps the
+        # model in DeepSpeed. DeepSpeed's ZeRO optimizer keeps its own FP32 "master"
+        # parameter copies for mixed-precision training; loading weights into the raw
+        # model first means those master copies are built from the resumed values. If
+        # loaded after prepare() (via unwrap_model().load_checkpoint()), only the BF16
+        # working copy is updated in place -- the FP32 master stays at its pre-resume
+        # (randomly-initialized) value, and the first optimizer step overwrites the
+        # working copy from that stale master, silently discarding the resumed weights
+        # for any parameter whose master wasn't independently refreshed.
+        self._weights_resumed_early = False
+        if self.resume:
+            resume_path = Path(str(self.resume))
+            if resume_path.exists() and not resume_path.is_dir():
+                logger.info("Loading weight checkpoint (pre-wrap, before accelerator.prepare()): %s", self.resume)
+                self.model.load_checkpoint(str(resume_path), optimizer=None)
+                self._weights_resumed_early = True
+
         self.model, self.optimizer, self.train_loader, self.scheduler = self.accelerator.prepare(
             self.model, self.optimizer, self.train_loader, self.scheduler
         )
@@ -270,6 +287,9 @@ class Wan22Trainer:
         if resume_path.is_dir():
             logger.info("Resuming full training state from directory: %s", resume)
             self.load_training_state(str(resume_path))
+            return
+        if getattr(self, "_weights_resumed_early", False):
+            logger.info("Weight checkpoint already loaded pre-wrap; skipping post-wrap reload: %s", resume)
             return
         if not resume_path.exists():
             raise FileNotFoundError(f"Resume checkpoint not found: {resume}")
