@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FastWAM experiment record",
+  "type": "object",
+  "required": [
+    "id",
+    "candidate_name",
+    "modifications",
+    "parent_checkpoint",
+    "status",
+    "report_path"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "candidate_name": {"type": "string"},
+    "parent_experiment": {"type": ["string", "null"]},
+    "parent_checkpoint": {"type": "string"},
+    "commit": {"type": ["string", "null"]},
+    "modifications": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "why_this_might_help": {"type": ["string", "null"]},
+    "what_to_watch": {"type": ["string", "null"]},
+    "initial_training_plan": {"type": ["object", "string", "null"]},
+    "training": {"type": ["object", "null"]},
+    "training_control_events": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "checkpoint": {"type": ["string", "null"]},
+          "step": {"type": ["integer", "null"], "minimum": 0},
+          "decision": {
+            "type": "string",
+            "enum": [
+              "CONTINUE_TRAINING",
+              "EXTEND_TRAINING",
+              "STOP_TRAINING",
+              "SELECT_CHECKPOINT",
+              "RECHECK_PROGRESS",
+              "DIAGNOSE"
+            ]
+          },
+          "reason": {"type": ["string", "null"]},
+          "evaluation_event_index": {"type": ["integer", "null"], "minimum": 0}
+        },
+        "required": ["decision"]
+      }
+    },
+    "selected_checkpoint": {"type": ["string", "null"]},
+    "evaluation": {"type": ["object", "null"]},
+    "metrics": {
+      "type": ["object", "null"],
+      "properties": {
+        "libero_90": {"type": ["number", "null"]},
+        "libero_spatial": {"type": ["number", "null"]},
+        "libero_object": {"type": ["number", "null"]},
+        "libero_goal": {"type": ["number", "null"]},
+        "libero_long": {"type": ["number", "null"]}
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PLANNED",
+        "RUNNING",
+        "EVALUATING",
+        "PROMOTE",
+        "REJECT",
+        "BRANCH",
+        "RETEST",
+        "CRASH"
+      ]
+    },
+    "interpretation": {"type": ["string", "null"]},
+    "artifacts": {"type": ["object", "null"]},
+    "report_path": {"type": "string"},
+    "system_snapshot_path": {"type": ["string", "null"]},
+    "dependency_snapshot_path": {"type": ["string", "null"]},
+    "evaluation_events": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "progress_check",
+              "candidate_screen",
+              "confirmation",
+              "canonical",
+              "diagnostic"
+            ]
+          },
+          "checkpoint": {"type": ["string", "null"]},
+          "step": {"type": ["integer", "null"], "minimum": 0},
+          "tasks": {
+            "type": ["array", "null"],
+            "items": {"type": "string"}
+          },
+          "trials_per_task": {"type": ["integer", "null"], "minimum": 1},
+          "reference_checkpoint": {"type": ["string", "null"]},
+          "result_summary": {"type": ["object", "string", "null"]},
+          "raw_results_path": {"type": ["string", "null"]},
+          "decision": {"type": ["string", "null"]}
+        },
+        "required": ["purpose"]
+      }
+    }
+  }
+}

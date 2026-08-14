@@ -1,0 +1,90 @@
+{
+  "captured_at_utc": "2026-08-08T02:36:28.411255+00:00",
+  "cpu": {
+    "logical_cpu_count": 128,
+    "model": "AMD EPYC 7532 32-Core Processor"
+  },
+  "cuda_toolkit": {
+    "nvcc": {
+      "ok": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Wed_Aug_20_01:58:59_PM_PDT_2025\nCuda compilation tools, release 13.0, V13.0.88\nBuild cuda_13.0.r13.0/compiler.36424714_0"
+    }
+  },
+  "disk": {
+    "free_gib": 955.65,
+    "path": "/workspace/fastwam_libero90/FastWAM",
+    "total_gib": 1016.0,
+    "used_gib": 60.35
+  },
+  "git": {
+    "branch": "autoresearch/libero90-v1",
+    "commit": "45d8e1458921d83f8ad6cf9ce993d371208dabd0",
+    "dirty": false,
+    "status_porcelain": ""
+  },
+  "gpu": {
+    "nvidia_smi_query": {
+      "ok": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "0, NVIDIA A100-SXM4-80GB, 81920 MiB, 580.105.08\n1, NVIDIA A100-SXM4-80GB, 81920 MiB, 580.105.08\n2, NVIDIA A100-SXM4-80GB, 81920 MiB, 580.105.08\n3, NVIDIA A100-SXM4-80GB, 81920 MiB, 580.105.08"
+    }
+  },
+  "memory": {
+    "total": {
+      "bytes": 2016374788096,
+      "gib": 1877.9
+    }
+  },
+  "os": {
+    "kernel": "6.8.0-90-generic",
+    "machine": "x86_64",
+    "os_release": "PRETTY_NAME=\"Ubuntu 24.04.4 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.4 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+    "platform": "Linux-6.8.0-90-generic-x86_64-with-glibc2.39"
+  },
+  "packages": {
+    "accelerate": "1.12.0",
+    "deepspeed": "0.18.5",
+    "torch": {
+      "cuda_available": true,
+      "cuda_version": "12.8",
+      "cudnn_version": 90701,
+      "device_count": 4,
+      "devices": [
+        {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 1,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 2,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 3,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        }
+      ],
+      "version": "2.7.1+cu128"
+    },
+    "transformers": "4.49.0"
+  },
+  "python": {
+    "executable": "/workspace/venv-fastwam/bin/python",
+    "version": "3.10.20 (main, Jun  2 2026, 22:25:53) [Clang 22.1.3 ]"
+  },
+  "repo": "/workspace/fastwam_libero90/FastWAM",
+  "selected_environment": {
+    "NCCL_VERSION": "2.28.3-1",
+    "VIRTUAL_ENV": "/workspace/venv-fastwam"
+  }
+}
