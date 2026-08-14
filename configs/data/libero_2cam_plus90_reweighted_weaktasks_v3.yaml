@@ -1,0 +1,98 @@
+train:
+  _target_: fastwam.datasets.lerobot.robot_video_dataset.RobotVideoDataset
+  dataset_dirs:
+    - ./data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_object_no_noops_lerobot
+    # libero_goal oversampled 5x (433 -> 2165 episodes) to restore ~its original ~25% mix
+    # share, given experiment 0001/0002 showed it collapsing under simple 1x concatenation
+    # despite having a similar episode count to libero_spatial, which held up much better --
+    # see research/NOTES.md "Investigation: exp0001 suite-selective catastrophic forgetting".
+    - ./data/libero_mujoco3.3.2/libero_goal_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_goal_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_goal_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_goal_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_goal_no_noops_lerobot
+    # libero_10 (Long) oversampled 5x (388 -> 1940 episodes), same rationale -- it has the
+    # fewest original-suite episodes and is the only long-horizon/multi-step suite, both
+    # plausible reasons it never recovered even after 8000 steps of unweighted training.
+    - ./data/libero_mujoco3.3.2/libero_10_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_10_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_10_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_10_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_10_no_noops_lerobot
+    - ./data/libero_mujoco3.3.2/libero_90_no_noops_lerobot
+    # exp0018's broadened LIBERO-90 weak-task subset (11 tasks, 654 episodes, 4x oversampled)
+    - ./data/libero_mujoco3.3.2/libero_90_weak_subset_v2_lerobot
+    - ./data/libero_mujoco3.3.2/libero_90_weak_subset_v2_lerobot
+    - ./data/libero_mujoco3.3.2/libero_90_weak_subset_v2_lerobot
+    - ./data/libero_mujoco3.3.2/libero_90_weak_subset_v2_lerobot
+    # exp0019: LIBERO-Spatial is now the sole suite below the 95% goal (94.80%, -0.20pp),
+    # with 2 of its 10 tasks (top-drawer bowl, ramekin bowl) clearly weaker than the rest
+    # (76%/80% vs 96-100% for all others). Small, targeted subset (80 episodes, 2 tasks)
+    # oversampled 4x (320 episodes, ~2.3% of the resulting ~14,000-episode mix) -- a much
+    # smaller, lower-risk addition than the LIBERO-90 rounds, since Spatial's gap is tiny
+    # and concentrated in just 2 tasks.
+    - ./data/libero_mujoco3.3.2/libero_spatial_weak_subset_lerobot
+    - ./data/libero_mujoco3.3.2/libero_spatial_weak_subset_lerobot
+    - ./data/libero_mujoco3.3.2/libero_spatial_weak_subset_lerobot
+    - ./data/libero_mujoco3.3.2/libero_spatial_weak_subset_lerobot
+  shape_meta:
+    images:
+      - key: image
+      # - key: observation.images.image
+        raw_shape: [3, 512, 512]
+        shape: [3, 224, 224]
+      - key: wrist_image
+      # - key: observation.images.wrist_image
+        raw_shape: [3, 512, 512]
+        shape: [3, 224, 224]
+    action:
+      - key: default
+      # - key: action
+        raw_shape: 7 # before transform
+        shape: 7 # after transform
+    state:
+      - key: default
+      # - key: observation.state
+        raw_shape: 8 # before transform
+        shape: 8 # after transform
+  num_frames: 33
+  global_sample_stride: 1
+  action_video_freq_ratio: 4 # 32 action, 9 video frames
+  video_size: [224, 448] # final resize video
+  camera_key: null
+  val_set_proportion: 0.0
+  is_training_set: true
+  skip_padding_as_possible: false
+  concat_multi_camera: "horizontal"
+  processor:
+    _target_: fastwam.datasets.lerobot.processors.fastwam_processor.FastWAMProcessor
+    shape_meta: ${data.train.shape_meta}
+    num_obs_steps: ${data.train.num_frames}
+    num_output_cameras: 2
+    action_output_dim: 7 # eef_pose (6) + gripper (1)
+    proprio_output_dim: 8 # eef_pose (6) + gripper (2)
+    delta_action_dim_mask:
+      default: [true, true, true, true, true, true, false] # eef poses are delta, gripper is not
+
+    # action & state normalization
+    action_state_transforms: null
+    # action_state_transforms:
+    #   - _target_: fastwam.datasets.lerobot.transforms.libero.LiberoTransform
+    use_stepwise_action_norm: False
+    norm_default_mode: min/max
+    norm_exception_mode: null
+
+    action_state_merger:
+      _target_: fastwam.datasets.lerobot.transforms.action_state_merger.ConcatLeftAlign
+
+    train_transforms:
+      - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size: [224, 224]
+    val_transforms:
+      - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size: [224, 224]
+  text_embedding_cache_dir: ./data/text_embeds_cache/libero
+  context_len: 128
