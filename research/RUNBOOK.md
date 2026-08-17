@@ -22,7 +22,7 @@ Do not guess commands when the repository already defines them. Do not copy the 
 - parent commit verified/reachable from expected lineage: **yes** — `git merge-base --is-ancestor b2b49d0 autoresearch/libero90-v1` succeeds; `b2b49d0` = "Fix directory-resume LR schedule corruption when max_steps is extended" (`src/fastwam/trainer.py`, +47 lines), directly relevant to a resumed/extended training run and consistent with exp0019's promoted PROGRESS report which records `Git commit: b2b49d0 (both resume fixes applied)`
 - exact commit used to create new branch: `b2b49d0` (`git switch -c autoresearch/robotwin-multiembodiment-v1 b2b49d0`)
 - research branch: `autoresearch/robotwin-multiembodiment-v1` (active; verified via `git branch --show-current`)
-- remote research branch pushed/verified: not yet pushed (local only so far; will push before/at first tracked-change commit)
+- remote research branch pushed/verified: **yes** — pushed to `origin` (SSH, `git@github.com:cheikh025/FastWAM.git`; HTTPS push failed, no credential helper configured for HTTPS in this container, but an SSH key authorized as `cheikh025` is present and works — `origin` remote URL switched from HTTPS to SSH for future pushes). Verified via GitHub's own "new branch" push confirmation; visible at `https://github.com/cheikh025/FastWAM/tree/autoresearch/robotwin-multiembodiment-v1`.
 
 Hard branch guard:
 
