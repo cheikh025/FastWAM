@@ -40,6 +40,7 @@ class FastWAMProcessor(BaseProcessor):
 
         tokenizer: Optional[Any] = None,
         delta_action_dim_mask: Optional[Dict[str, List[bool]]] = None,
+        embodiment_description: Optional[str] = None,
     ):
         self.shape_meta = shape_meta
         self.num_obs_steps = num_obs_steps
@@ -49,6 +50,7 @@ class FastWAMProcessor(BaseProcessor):
 
         self.drop_high_level_prob = drop_high_level_prob
         self.use_zh_instruction = use_zh_instruction
+        self.embodiment_description = embodiment_description
 
         # image
         self.train_transforms = train_transforms
@@ -131,7 +133,10 @@ class FastWAMProcessor(BaseProcessor):
         else:
             high_level_instruction = ""
         if "task" not in data:
-            return f"[high] {high_level_instruction}"
+            instruction = f"[high] {high_level_instruction}"
+            if self.embodiment_description:
+                instruction = f"{self.embodiment_description} {instruction}"
+            return instruction
 
         low_level_instruction = data["task"]
         # Galaxea lerobot use @ to split Chinese and English instruction
@@ -141,9 +146,12 @@ class FastWAMProcessor(BaseProcessor):
 
         if np.random.rand() < self.drop_high_level_prob:
             instruction = f"{low_level_instruction}"
-        else: 
+        else:
             instruction = f"[High]: {high_level_instruction}, [Low]: {low_level_instruction}"
-        
+
+        if self.embodiment_description:
+            instruction = f"{self.embodiment_description} {instruction}"
+
         return instruction
 
     def action_state_transform(self, batch):

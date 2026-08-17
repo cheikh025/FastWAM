@@ -1,9 +1,9 @@
 from typing import Any, Optional
 
 import torch
-import torch.nn.functional as F
 
 from fastwam.utils.logging_config import get_logger
+from fastwam.utils.losses import masked_action_loss
 
 from .fastwam_joint import FastWAMJoint
 
@@ -63,6 +63,7 @@ class FastWAMIDM(FastWAMJoint):
         context_mask = inputs["context_mask"]
         action = inputs["action"]
         action_is_pad = inputs["action_is_pad"]
+        action_dim_is_pad = inputs["action_dim_is_pad"]
         image_is_pad = inputs["image_is_pad"]
         fuse_flag = inputs["fuse_vae_embedding_in_latents"]
 
@@ -206,13 +207,9 @@ class FastWAMIDM(FastWAMJoint):
         )
         loss_video = (loss_video_per_sample * video_weight).mean()
 
-        action_loss_token = F.mse_loss(pred_action.float(), target_action.float(), reduction="none").mean(dim=2)
-        if action_is_pad is not None:
-            valid = (~action_is_pad).to(device=action_loss_token.device, dtype=action_loss_token.dtype)
-            valid_sum = valid.sum(dim=1).clamp(min=1.0)
-            action_loss_per_sample = (action_loss_token * valid).sum(dim=1) / valid_sum
-        else:
-            action_loss_per_sample = action_loss_token.mean(dim=1)
+        # Two-level masked average (Qwen-VLA-style) for the shared padded multi-embodiment
+        # action interface — see fastwam.utils.losses.masked_action_loss.
+        action_loss_per_sample = masked_action_loss(pred_action, target_action, action_is_pad, action_dim_is_pad)
 
         action_weight = self.train_action_scheduler.training_weight(timestep_action).to(
             action_loss_per_sample.device, dtype=action_loss_per_sample.dtype

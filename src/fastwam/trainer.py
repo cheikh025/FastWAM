@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from .utils.fs import ensure_dir
 from .utils.logging_config import get_logger, setup_logging
 from .utils.pytorch_utils import set_global_seed
-from .utils.samplers import ResumableEpochSampler
+from .utils.samplers import InterleavedEmbodimentSampler, ResumableEpochSampler
 from .utils.video_io import save_mp4
 from .utils.video_metrics import pil_frames_to_video_tensor, video_psnr, video_ssim
 
@@ -182,12 +182,27 @@ class Wan22Trainer:
         self.wandb_run = None
 
     def _build_loader(self, dataset, worker_init_fn=None):
-        self.train_sampler = ResumableEpochSampler(
-            dataset=dataset,
-            seed=self.seed,
-            batch_size=self.batch_size,
-            num_processes=self.accelerator.num_processes,
-        )
+        embodiment_ratios = getattr(dataset, "embodiment_ratios", None)
+        if embodiment_ratios is not None:
+            logger.info(
+                "Building InterleavedEmbodimentSampler: embodiments=%s ratios=%s",
+                getattr(dataset, "embodiment_names", None),
+                embodiment_ratios,
+            )
+            self.train_sampler = InterleavedEmbodimentSampler(
+                dataset=dataset,
+                seed=self.seed,
+                batch_size=self.batch_size,
+                num_processes=self.accelerator.num_processes,
+                ratios=embodiment_ratios,
+            )
+        else:
+            self.train_sampler = ResumableEpochSampler(
+                dataset=dataset,
+                seed=self.seed,
+                batch_size=self.batch_size,
+                num_processes=self.accelerator.num_processes,
+            )
         return DataLoader(
             dataset,
             batch_size=self.batch_size,

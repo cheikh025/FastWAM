@@ -231,6 +231,10 @@ class RobotVideoDataset(torch.utils.data.Dataset):
             "action_is_pad": sample["action_is_pad"],
             "proprio_is_pad": sample["proprio_is_pad"],
         }
+        if "action_dim_is_pad" in sample:
+            data["action_dim_is_pad"] = sample["action_dim_is_pad"]
+        if "proprio_dim_is_pad" in sample:
+            data["proprio_dim_is_pad"] = sample["proprio_dim_is_pad"]
         return data
 
     def _get_cached_text_context(self, prompt: str):

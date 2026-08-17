@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from PIL import Image
 
 from fastwam.utils.logging_config import get_logger
+from fastwam.utils.losses import masked_action_loss
 
 from .action_dit import ActionDiT
 from .helpers.loader import load_wan22_ti2v_5b_components
@@ -322,6 +323,18 @@ class FastWAM(torch.nn.Module):
                     f"got {tuple(action_is_pad.shape)} vs expected ({batch_size}, {action_horizon})"
                 )
 
+        action_dim_is_pad = sample.get("action_dim_is_pad", None)
+        if action_dim_is_pad is not None:
+            if action_dim_is_pad.ndim != 2:
+                raise ValueError(
+                    f"`sample['action_dim_is_pad']` must be 2D [B, action_dim], got shape {tuple(action_dim_is_pad.shape)}"
+                )
+            if action_dim_is_pad.shape[0] != batch_size or action_dim_is_pad.shape[1] != action.shape[2]:
+                raise ValueError(
+                    "`sample['action_dim_is_pad']` shape mismatch: "
+                    f"got {tuple(action_dim_is_pad.shape)} vs expected ({batch_size}, {action.shape[2]})"
+                )
+
         image_is_pad = sample.get("image_is_pad", None)
         if image_is_pad is not None:
             if image_is_pad.ndim != 2:
@@ -370,6 +383,8 @@ class FastWAM(torch.nn.Module):
             action_is_pad = action_is_pad.to(device=self.device, dtype=torch.bool, non_blocking=True)
         if image_is_pad is not None:
             image_is_pad = image_is_pad.to(device=self.device, dtype=torch.bool, non_blocking=True)
+        if action_dim_is_pad is not None:
+            action_dim_is_pad = action_dim_is_pad.to(device=self.device, dtype=torch.bool, non_blocking=True)
 
         return {
             "context": context,
@@ -379,6 +394,7 @@ class FastWAM(torch.nn.Module):
             "fuse_vae_embedding_in_latents": fuse_flag,
             "action": action,
             "action_is_pad": action_is_pad,
+            "action_dim_is_pad": action_dim_is_pad,
             "image_is_pad": image_is_pad,
         }
 
@@ -453,6 +469,7 @@ class FastWAM(torch.nn.Module):
         context_mask = inputs["context_mask"]
         action = inputs["action"]
         action_is_pad = inputs["action_is_pad"]
+        action_dim_is_pad = inputs["action_dim_is_pad"]
         image_is_pad = inputs["image_is_pad"]
 
         noise_video = torch.randn_like(input_latents)
@@ -547,13 +564,9 @@ class FastWAM(torch.nn.Module):
         )
         loss_video = (loss_video_per_sample * video_weight).mean()
 
-        action_loss_token = F.mse_loss(pred_action.float(), target_action.float(), reduction="none").mean(dim=2) # [B, T]
-        if action_is_pad is not None:
-            valid = (~action_is_pad).to(device=action_loss_token.device, dtype=action_loss_token.dtype)
-            valid_sum = valid.sum(dim=1).clamp(min=1.0)
-            action_loss_per_sample = (action_loss_token * valid).sum(dim=1) / valid_sum
-        else:
-            action_loss_per_sample = action_loss_token.mean(dim=1)
+        # Two-level masked average (Qwen-VLA-style) for the shared padded multi-embodiment
+        # action interface — see fastwam.utils.losses.masked_action_loss.
+        action_loss_per_sample = masked_action_loss(pred_action, target_action, action_is_pad, action_dim_is_pad)
 
         action_weight = self.train_action_scheduler.training_weight(timestep_action).to(
             action_loss_per_sample.device, dtype=action_loss_per_sample.dtype

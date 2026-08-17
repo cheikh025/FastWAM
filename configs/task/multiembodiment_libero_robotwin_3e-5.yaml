@@ -1,0 +1,39 @@
+# @package _global_
+#
+# First multi-embodiment candidate (PROGRESS_0001_padded_multiembodiment_baseline):
+# resumes from an *expanded* exp0019 checkpoint (see
+# research/tools/expand_checkpoint_for_multiembodiment.py) and continues training on
+# an interleaved LIBERO(4 suites)+RoboTwin mixture via the shared padded K=14 action
+# interface. `resume=<path>` is passed at launch time (not baked in here), matching
+# the established convention for continuation runs off a promoted checkpoint.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+# dataloading — batch_size=1 per GPU is the setup-validated OOM-safe floor for this
+# model's DeepSpeed ZeRO-1 optimizer step on an 80GB A100 (see research/RUNBOOK.md
+# "Training smoke"); gradient_accumulation_steps raises the effective batch size.
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+# scheduler — a conservative continuation LR (matching the parent lineage's own
+# continuation-fine-tuning convention, e.g. exp0019's 3e-5) rather than a
+# from-scratch-training LR (1e-4), since this resumes an already-converged,
+# promoted checkpoint and a large LR risks larger, harder-to-recover forgetting.
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1 # unused: max_steps below takes precedence in Wan22Trainer._estimate_total_train_steps
+max_steps: 1000 # small, conservative initial budget for the first mixed-embodiment run — not a promise to consume the whole budget; see $run-fastwam-training for progress-check-driven continuation/extension.
+log_every: 10
+save_every: 100
+eval_every: 200
+
+# training
+weight_decay: 1e-2
+resume: null
