@@ -1,0 +1,90 @@
+{
+  "captured_at_utc": "2026-08-17T21:34:33.163491+00:00",
+  "cpu": {
+    "logical_cpu_count": 128,
+    "model": "AMD EPYC 7513 32-Core Processor"
+  },
+  "cuda_toolkit": {
+    "nvcc": {
+      "ok": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0"
+    }
+  },
+  "disk": {
+    "free_gib": 928.02,
+    "path": "/workspace/FastWAM",
+    "total_gib": 1097.0,
+    "used_gib": 168.98
+  },
+  "git": {
+    "branch": "autoresearch/robotwin-multiembodiment-v1",
+    "commit": "b2b49d0f949408ea856de7bd64540e92e1d790c2",
+    "dirty": true,
+    "status_porcelain": "?? AUTORESEARCH.md\n?? CLAUDE.md\n?? SOURCES.md\n?? research/\n?? third_party/RoboTwin/policy/fastwam_policy"
+  },
+  "gpu": {
+    "nvidia_smi_query": {
+      "ok": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "0, NVIDIA A100-SXM4-80GB, 81920 MiB, 570.211.01\n1, NVIDIA A100-SXM4-80GB, 81920 MiB, 570.211.01\n2, NVIDIA A100-SXM4-80GB, 81920 MiB, 570.211.01\n3, NVIDIA A100-SXM4-80GB, 81920 MiB, 570.211.01"
+    }
+  },
+  "memory": {
+    "total": {
+      "bytes": 1487891001344,
+      "gib": 1385.71
+    }
+  },
+  "os": {
+    "kernel": "5.15.0-186-generic",
+    "machine": "x86_64",
+    "os_release": "PRETTY_NAME=\"Ubuntu 24.04.4 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.4 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+    "platform": "Linux-5.15.0-186-generic-x86_64-with-glibc2.39"
+  },
+  "packages": {
+    "accelerate": "1.12.0",
+    "deepspeed": "0.18.5",
+    "torch": {
+      "cuda_available": true,
+      "cuda_version": "12.8",
+      "cudnn_version": 90701,
+      "device_count": 4,
+      "devices": [
+        {
+          "index": 0,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 1,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 2,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        },
+        {
+          "index": 3,
+          "name": "NVIDIA A100-SXM4-80GB",
+          "total_memory_gib": 79.25
+        }
+      ],
+      "version": "2.7.1+cu128"
+    },
+    "transformers": "4.49.0"
+  },
+  "python": {
+    "executable": "/workspace/venvs/fastwam/bin/python3",
+    "version": "3.10.20 (main, Jun  2 2026, 22:25:53) [Clang 22.1.3 ]"
+  },
+  "repo": "/workspace/FastWAM",
+  "selected_environment": {
+    "NCCL_VERSION": "2.25.1-1",
+    "VIRTUAL_ENV": "/workspace/venvs/fastwam"
+  }
+}
