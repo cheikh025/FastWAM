@@ -139,6 +139,30 @@ Not applicable — setup already validated; no infrastructure changes this candi
 - monitoring: persistent `Monitor` on the training log
 - no smoke test run this time — this is exp0004's exact, already-repeatedly-verified recipe (same code path exercised successfully in exp0004 and exp0006), not a new code/config path
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies. Final: `loss=0.9458
+loss_action=0.7719 loss_video=0.1738`. **Notable: this is nearly identical to
+exp0004's own final loss (`loss=0.9458 loss_action=0.7720 loss_video=0.1738`,
+matching to 3-4 significant figures)** — strong circumstantial evidence the
+training pipeline is effectively deterministic given this recipe (likely a fixed
+default `seed` config value applied uniformly, not genuine run-to-run randomness),
+meaning this checkpoint is probably very close to exp0004's original rather than an
+independent draw. This actually makes the enlarged RoboTwin re-evaluation *more*
+directly informative: it's closer to "does more episodes reveal a different picture
+for essentially the same model" than "does a different training draw reproduce the
+capability" — still answers the core reproducibility-of-measurement question, just
+via a different mechanism than originally planned. Checkpoint `step_001000.pt`
+verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf, `step: 1000`.
+
+### Evaluation launch
+
+LIBERO-Spatial screen launched on GPUs 0-1 (`MULTIRUN.num_gpus=2`); RoboTwin
+progress check launched in parallel on GPUs 2-3 (`CUDA_VISIBLE_DEVICES=2` for
+`adjust_bottle`, `=3` for `click_alarmclock` at the enlarged `eval_num_episodes=10`)
+— all 4 GPUs used concurrently since the two evaluators don't overlap on GPU
+indices, saving wall-clock time versus running them sequentially.
+
 ## 7. Evaluation events
 
 None yet.
