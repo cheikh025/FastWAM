@@ -178,4 +178,42 @@ tricks.
 
 ## 7. Evaluation events
 
-None yet.
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0007, step 1000
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0007_replication_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0007_replication_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0004/exp0005/exp0006 all landed at exactly 63.33% (19/30)
+- **result: 56.67% (17/30)** — close to but *not* exactly matching the prior three
+  candidates' identical 63.33%. This is actually informative: it shows the "ceiling"
+  observed across exp0004/0005/0006 was not a perfectly deterministic artifact
+  (despite the near-identical training loss noted above) — there is real run-to-run
+  variance in this recipe, just concentrated in a fairly narrow band (56-63%,
+  17-19/30) across four independent runs so far, well below the 90% floor in every
+  case.
+- per-task breakdown vs. exp0004 (step 1000) and exp0006 (step 4000, for range context):
+
+  | Task | exp0004 | exp0006 (4k) | exp0007 (replication) |
+  |---|---:|---:|---:|
+  | task0 | 66.7% | 33.3% | 33.3% |
+  | task1 | 0% | 33.3% | 0% |
+  | task2 | 100% | 100% | 100% |
+  | task3 | 66.7% | 100% | 100% |
+  | task4 | 0% | 0% | 0% |
+  | task5 | 66.7% | 33.3% | 33.3% |
+  | task6 | 100% | 100% | 100% |
+  | task7 | 100% | 100% | 100% |
+  | task8 | 100% | 100% | **66.7%** |
+  | task9 | 33.3% | 33.3% | 33.3% |
+  | **Overall** | **63.3%** | **63.3%** | **56.7%** |
+
+  task4 remains 0% in **every** multi-embodiment candidate measured so far (4 for 4).
+- runtime: ~35 minutes
+- validity checks: 10/10 task result files present, correct checkpoint/stats.
