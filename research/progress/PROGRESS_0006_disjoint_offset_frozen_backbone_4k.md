@@ -214,4 +214,7 @@ noisier than the full screen used for final candidate evaluation.
     EVALUATION.num_trials=1 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
     model.redirect_common_files=false
   ```
-- result: launched, awaiting completion
+- **result: 80.00% (8/10)** — succeeded this time (no pruner-race crash; likely because with `max_tasks_per_gpu=2`'s 4-way launch parallelism, all 10 tasks had already loaded the checkpoint into memory before the next prune event, even though the eval's own wall-clock (~28 min) ran past it).
+- per-task: 8 of 10 tasks at 100% (1/1), 2 at 0% — `libero_spatial_4` (the task that is 0% in *every* multi-embodiment candidate so far, including the baseline's own weakest at 66.7%) and `libero_spatial_1` (0% here; was 100% for exp0004 at step 1000, so likely just single-trial noise, not a real regression).
+- context: this is a noisier 1-trial/task panel (10 episodes total, vs. the standard 3-trial/30-episode `candidate_screen`), so not directly comparable in precision to exp0004's step-1000 63.33% (from a 3-trial panel) — but as a rough training-control signal, 80% at step 1500 is a healthy, non-degrading sign that retention has not collapsed under continued training on this recipe.
+- decision enabled by this evidence: **`CONTINUE_TRAINING`** — no sign of divergence or collapse at the halfway-ish point; let the run continue toward 4000 steps and evaluate properly (full 3-trial screen + RoboTwin progress check) on the final checkpoint.
