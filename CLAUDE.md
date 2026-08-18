@@ -16,57 +16,45 @@ If setup has not been completed, use `$setup-fastwam-research` before selecting 
 
 Fast-WAM is a World Action Model that uses video/world-model co-training during training and directly generates robot actions at inference without explicit future-video generation.
 
-This project does **not** start from the public released LIBERO checkpoint. It inherits the previously validated successful LIBERO checkpoint `exp0019` and its checkpoint-producing code state, then adapts that model to RoboTwin for multi-embodiment learning.
+This project starts from the **official FastWAM LIBERO release checkpoint** (`libero_uncond_2cam224.pt`, published at `https://huggingface.co/yuanty/fastwam`), not from the `exp0019` research lineage. `exp0019` was tried first and found to be unusually sensitive to the checkpoint-expansion process specifically on LIBERO-Spatial (a ~23pp swing between random seeds on the expanded checkpoint, traced to `exp0019`'s own narrow final fine-tuning stage — see `research/progress/PROGRESS_0011*.md`), while the release checkpoint expands cleanly and reproducibly (~96-97% either way, across seeds). The release checkpoint is the new parent going forward.
 
-Inherited parent checkpoint:
+Parent checkpoint:
 
-`runs/reweighted_libero90_finetune/exp0019_spatial_weak_task_oversample/checkpoints/weights/step_005000.pt`
+`checkpoints/fastwam_release/libero_uncond_2cam224.pt` (downloaded from `yuanty/fastwam` on Hugging Face; paired stats at `checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json`)
 
-Recorded durable copy:
+No prior research-lineage code commit applies to this checkpoint — it is the public release artifact, not a research checkpoint from `autoresearch/libero90-v1`.
 
-`cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt`
+Verified parent performance (measured fresh on this machine, LIBERO-Spatial only so far — see `research/progress/PROGRESS_0011*.md`):
 
-Checkpoint-producing code commit to verify: `b2b49d0` on the lineage of `autoresearch/libero90-v1`.
+| Benchmark | Success | Trials |
+|---|---:|---:|
+| LIBERO-Spatial (native, K=7) | not yet measured | — |
+| LIBERO-Spatial (expanded, K=21, zero-init) | 96.00% / 97.00% / 97.00% | n=10, three independent runs (two seeds) |
 
-Previously validated canonical parent performance:
-
-| Benchmark | Success |
-|---|---:|
-| LIBERO-Spatial | 97.00% |
-| LIBERO-Object | 99.60% |
-| LIBERO-Goal | 97.20% |
-| LIBERO-Long / LIBERO-10 | 98.00% |
-| LIBERO-90 | 95.13% |
-
-These values are inherited facts from the parent project, not new-run measurements.
+LIBERO-Object, LIBERO-Goal, and LIBERO-Long have not yet been measured for the release checkpoint (they were measured for `exp0019` during the now-superseded investigation; do not reuse those numbers as if they applied to the release checkpoint). Measure a release-checkpoint baseline on Spatial/Object/Goal/Long before the first real training candidate.
 
 ## Objective
 
-Produce a single FastWAM research line that performs strongly on RoboTwin while preserving the inherited LIBERO capability.
+Produce a single FastWAM research line that reaches **>=90% average RoboTwin success on the full 50-task Aloha-AgileX benchmark**, evaluated as Clean and Randomized splits separately (both must clear 90%), while keeping LIBERO retention strong.
 
 Hard main-line retention constraints:
 
-- LIBERO-90 >= 90%
 - LIBERO-Spatial >= 90%
 - LIBERO-Object >= 90%
 - LIBERO-Goal >= 90%
 - LIBERO-Long / LIBERO-10 >= 90%
 
-Among checkpoints satisfying all five LIBERO constraints, prioritize stronger performance under the verified canonical RoboTwin evaluation. Do not hide a LIBERO failure inside a cross-benchmark average.
+**LIBERO-90 is explicitly out of scope for this goal** — do not optimize for it, and do not spend evaluation budget on it unless it becomes directly relevant to a specific decision (e.g., diagnosing a suspected broad regression). It is not a promotion constraint.
 
-Do not invent a RoboTwin target percentage before the actual official/FastWAM evaluation protocol and metrics are verified. Record the canonical RoboTwin metric(s) in `research/RUNBOOK.md` and keep their semantics fixed afterward.
+Among checkpoints satisfying all four LIBERO constraints, prioritize stronger performance under the verified canonical RoboTwin evaluation (Clean and Randomized, both >=90%, full 50-task average). Do not hide a LIBERO failure inside a cross-benchmark average.
+
+Record the canonical RoboTwin metric(s) and exact protocol in `research/RUNBOOK.md` and keep their semantics fixed afterward.
 
 ## Git safety and lineage
 
-The previous branch `autoresearch/libero90-v1` is a **read-only parent** for this project.
+The previous branch `autoresearch/libero90-v1` remains a **read-only parent** for this project (historical code lineage, no longer the checkpoint source of truth now that the parent checkpoint is the public release artifact rather than an `exp0019`-lineage research checkpoint).
 
-During setup:
-
-1. clone/fetch the fork and upstream;
-2. switch to `autoresearch/libero90-v1` only to inspect/verify provenance;
-3. verify that commit `b2b49d0` is the intended checkpoint-producing code state and is reachable from the expected lineage;
-4. create `autoresearch/robotwin-multiembodiment-v1` from the exact verified parent code state;
-5. confirm the new RoboTwin branch is current **before making any tracked changes**.
+All RoboTwin multi-embodiment work happens on `autoresearch/robotwin-multiembodiment-v1` (already created and active — confirm with `git branch --show-current` before any tracked change).
 
 Never commit, push, or conduct RoboTwin research directly on `autoresearch/libero90-v1`.
 
@@ -149,8 +137,8 @@ This is not a checklist. Prefer the smallest coherent candidate worth the comput
 
 Setup must identify and verify both canonical evaluation paths:
 
-- the five LIBERO benchmarks;
-- RoboTwin as used by the current FastWAM/RoboTwin integration.
+- the four in-scope LIBERO benchmarks (Spatial, Object, Goal, Long — LIBERO-90 is out of scope for this goal);
+- RoboTwin as used by the current FastWAM/RoboTwin integration (full 50-task Aloha-AgileX, Clean and Randomized splits).
 
 Do not improve reported performance by changing success definitions, task membership, prompt/instruction modes, environment difficulty, rollout horizon, action semantics, aggregation, or other benchmark behavior between checkpoints.
 
@@ -166,16 +154,16 @@ Cheap panels are efficiency tools, not alternative benchmarks. Compare checkpoin
 
 ## Parent validation instead of an unnecessary full re-baseline
 
-Before the first research modification:
+Before the first real training candidate on the release-checkpoint parent:
 
-1. verify/download the exact exp0019 checkpoint and record cryptographic/file identity when practical;
-2. verify the parent code state and create the new RoboTwin branch before tracked changes;
-3. validate LIBERO evaluation, training, checkpoint loading/resume, and RoboTwin environment/evaluation paths with lightweight smoke tests;
-4. perform enough LIBERO sentinel validation to catch a broken fresh-machine setup;
+1. verify/download the exact release checkpoint (`checkpoints/fastwam_release/libero_uncond_2cam224.pt`) and its paired stats, and record file identity when practical;
+2. confirm the RoboTwin branch is current before tracked changes;
+3. validate LIBERO evaluation, training, checkpoint loading/resume/expansion, and RoboTwin environment/evaluation paths with lightweight smoke tests;
+4. establish a real LIBERO-Spatial/Object/Goal/Long baseline for the release checkpoint (native and, once expanded for multi-embodiment, expanded) — do not assume `exp0019`'s old inherited numbers apply;
 5. when useful, use the official FastWAM RoboTwin specialist checkpoint as an evaluator/reference sanity check, not as the research parent;
-6. create/finalize `research/progress/PROGRESS_0000_PARENT_BASELINE.md` and initialize `research/STATE.md`.
+6. record this in a new parent-baseline progress report and update `research/STATE.md`.
 
-Do not spend the full five-suite canonical LIBERO evaluation cost again during setup merely to reproduce inherited exp0019 numbers if smoke/sentinel evidence is healthy. If the fresh-machine evidence conflicts materially with the inherited canonical record, investigate and broaden validation before research begins.
+The `exp0019` investigation (`research/progress/PROGRESS_0000` through `PROGRESS_0011`) remains valid history and is not being erased — it is the reason the parent changed, and its lessons (checkpoint-expansion zero-init fix, dataset-stats-must-match-training-distribution, no undeclared conditioning mechanisms, always compare against a matching-precision/matching-pipeline baseline) all still apply to the release-checkpoint parent.
 
 ## Research records
 
@@ -231,7 +219,7 @@ Candidate-level decisions:
 - `BRANCH`
 - `RETEST`
 
-`PROMOTE` requires canonical evidence showing all five LIBERO benchmarks remain >=90% and the candidate is the best current main-line choice under the verified RoboTwin objective. Near ties favor stronger worst-case retention margin, less unnecessary LIBERO regression, reproducibility/stability, lower unnecessary compute, and simpler implementations.
+`PROMOTE` requires canonical evidence showing all four LIBERO benchmarks (Spatial, Object, Goal, Long) remain >=90%, canonical RoboTwin Clean and Randomized both >=90% on the full 50-task average, and the candidate is the best current main-line choice. Near ties favor stronger worst-case retention margin, less unnecessary LIBERO regression, reproducibility/stability, lower unnecessary compute, and simpler implementations.
 
 ## Failure handling
 
