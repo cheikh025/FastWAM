@@ -164,6 +164,33 @@ after verification; log at `checkpoints/exp0005_smoke_train.log`.
 - disk safety: background pruner (`checkpoints/prune_checkpoints_exp0005.log`), `KEEP=1`, 15s polling, 45GB free at launch
 - monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies. Final: `loss=0.6415
+loss_action=0.4886 loss_video=0.1529` (backbone-group `lr` decayed to `3.00e-07`
+per the logged value, which tracks `optimizer.param_groups[0]` i.e. the backbone
+group). Notably `loss_action` at completion (0.4886) sits between exp0003's
+trainable-backbone result (0.1009) and exp0004's frozen-backbone result (0.7720) —
+consistent with the backbone having *some* plasticity (more fitting capacity than
+fully frozen, less than fully trainable). Checkpoint `step_001000.pt`
+(12,041,907,985 bytes) verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero
+NaN/Inf, `step: 1000`. Training log: `checkpoints/exp0005_train.log`.
+
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0005, step 1000 (full budget)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0005_disjoint_offset_backbone_low_lr_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0005_disjoint_offset_backbone_low_lr_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0019 canonical 97.00%; setup sentinel 96.67%; exp0001 73.33%; exp0002 16.67%; exp0003 50.00%; exp0004 63.33%
+- result: launched, awaiting completion — log at `checkpoints/exp0005_libero_screen.log`
+
 ### Known minor imprecision (not a bug, documented for interpretation)
 
 `Trainer._build_scheduler`'s `CosineAnnealingLR(..., eta_min=self.learning_rate * 0.01)`
