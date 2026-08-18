@@ -1,18 +1,29 @@
 # PROGRESS_0006 — disjoint-offset frozen backbone, 4x training budget
 
 - **Experiment ID:** 0006
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0004_disjoint_offset_frozen_backbone (rejected on LIBERO floor, but the best-so-far recipe with genuine RoboTwin capability; this candidate directly extends its training budget)
 - **Parent checkpoint:** `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` (same expanded checkpoint used for exp0003/exp0004/exp0005 — reused)
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
-- **Git commit:** pending
+- **Git commit:** `26486df` (implementation); `c9d60f5` (final result)
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (4000/4000 steps, no NaN/anomalies, ~2h33m). LIBERO-Spatial
+candidate_screen: **63.33% (19/30)** — lands at the exact same aggregate as exp0004
+and exp0005's step-1000 results, despite 4x more training. The RoboTwin progress
+check is the striking result: `click_alarmclock` — the one real RoboTwin capability
+found anywhere in this project (33.3%/33.3% at step 1000) — **vanished entirely**
+(0.0%/0.0% at step 4000), while `adjust_bottle` stayed dead throughout. 4x more
+training on the exact same recipe destroyed the only RoboTwin capability that
+existed, rather than building on it. **Decision: `REJECT`.** Combined with exp0005,
+this establishes that neither more training steps nor a different backbone LR
+improves on exp0004 — both actively regress its one real result, suggesting
+exp0004's checkpoint sits near a narrow, fragile optimum rather than a stable,
+improvable capability. See Section 7 for full results and Section 9 for next steps.
 
 ## 2. Research state before experiment
 
@@ -111,7 +122,7 @@ exp0019), only `action_encoder`/`head`/`proprio_encoder` trainable, LR `3e-5`,
 
 ## 4. Exact code and configuration state
 
-- Git commit: pending (recorded after committing this report + config change together, before training launch)
+- Git commit: `26486df`
 - Git branch: `autoresearch/robotwin-multiembodiment-v1`
 - parent code commit: `4c481ae` (exp0005 REJECT commit)
 - working tree clean/dirty before launch: will be clean at commit time
