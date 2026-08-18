@@ -47,7 +47,8 @@ class Wan22Trainer:
         self.gradient_accumulation_steps = int(cfg.gradient_accumulation_steps)
         self.max_grad_norm = float(cfg.max_grad_norm)
         self.seed = int(cfg.seed)
-        
+        self.trainable_modules = str(cfg.get("trainable_modules", "dit"))
+
         self.resume = cfg.resume
         self.mixed_precision = str(cfg.mixed_precision).strip().lower()
         if self.mixed_precision not in {"no", "fp16", "bf16"}:
@@ -80,10 +81,22 @@ class Wan22Trainer:
         if self.val_dataset is not None:
             self._assert_dataset_length_consistent(self.val_dataset, "val_dataset")
 
-        # Freeze non-trainable modules before optimizer/deepspeed initialization.
-        # This keeps DiT (+ optional proprio encoder) as trainable when ZeRO builds optimizer state.
-        self._apply_dit_only_train_mode(self.model)
-        trainable_params = list(self.model.dit.parameters())
+        # Freeze non-trainable modules before optimizer/deepspeed initialization, and
+        # build the optimizer's param list to match EXACTLY what's left trainable --
+        # not just self.model.dit.parameters() -- so DeepSpeed ZeRO doesn't allocate
+        # master-weight/optimizer-state memory for params that will never receive a
+        # gradient (also matters for a mode like "expanded_projections_only" where
+        # most of the model is frozen).
+        self._set_dit_only_train_mode()
+        if self.trainable_modules == "dit":
+            trainable_params = list(self.model.dit.parameters())
+        elif self.trainable_modules == "expanded_projections_only":
+            action_mixture = self.model.mot.mixtures["action"]
+            trainable_params = list(action_mixture.action_encoder.parameters()) + list(
+                action_mixture.head.parameters()
+            )
+        else:
+            raise ValueError(f"Unknown trainable_modules: {self.trainable_modules!r}")
         proprio_encoder = getattr(self.model, "proprio_encoder", None)
         if proprio_encoder is not None:
             trainable_params.extend(list(proprio_encoder.parameters()))
@@ -314,10 +327,23 @@ class Wan22Trainer:
         logger.warning("Loaded .pt weights only; optimizer/scheduler/step were not restored under ZeRO2.")
 
     def _set_dit_only_train_mode(self):
-        # Match DiffSynth's freeze_except("dit"): only DiT stays trainable/in-train-mode.
-        logger.info("Setting DiT to train mode and freezing other model components.")
+        # Dispatches on self.trainable_modules so a configured freeze mode (e.g.
+        # "expanded_projections_only") survives re-application after evaluate() or at
+        # the start of train() -- not just at __init__ time. Name kept for the common
+        # "dit" case (matches DiffSynth's freeze_except("dit")); despite the name, this
+        # is the single entry point for (re-)establishing whichever train mode is
+        # configured.
         model = self.accelerator.unwrap_model(self.model)
-        self._apply_dit_only_train_mode(model)
+        if self.trainable_modules == "dit":
+            logger.info("Setting DiT to train mode and freezing other model components.")
+            self._apply_dit_only_train_mode(model)
+        elif self.trainable_modules == "expanded_projections_only":
+            logger.info(
+                "Freezing shared MoT backbone; training only action_encoder/head/proprio_encoder."
+            )
+            self._apply_expanded_projections_only_train_mode(model)
+        else:
+            raise ValueError(f"Unknown trainable_modules: {self.trainable_modules!r}")
 
     @staticmethod
     def _apply_dit_only_train_mode(model):
@@ -325,6 +351,30 @@ class Wan22Trainer:
         model.requires_grad_(False)
         model.dit.train()
         model.dit.requires_grad_(True)
+        proprio_encoder = getattr(model, "proprio_encoder", None)
+        if proprio_encoder is not None:
+            proprio_encoder.train()
+            proprio_encoder.requires_grad_(True)
+
+    @staticmethod
+    def _apply_expanded_projections_only_train_mode(model):
+        """Freeze the entire shared MoT backbone (both video and action DiT blocks) and
+        train only the layers that were newly expanded/added for the shared padded
+        multi-embodiment action interface: the action expert's `action_encoder`/`head`
+        (Linear projections in/out of the shared K-wide action space) and the top-level
+        `proprio_encoder`. This is a warm-up stage -- see
+        research/progress/PROGRESS_0002 -- intended to let the model learn to read/write
+        the newly-added action/proprio channels without the video-denoising loss (which
+        is NOT per-embodiment-masked, unlike the action loss) perturbing the shared
+        backbone that LIBERO's retention depends on, before any full unfreeze.
+        """
+        model.eval()
+        model.requires_grad_(False)
+        action_mixture = model.mot.mixtures["action"]
+        action_mixture.action_encoder.train()
+        action_mixture.action_encoder.requires_grad_(True)
+        action_mixture.head.train()
+        action_mixture.head.requires_grad_(True)
         proprio_encoder = getattr(model, "proprio_encoder", None)
         if proprio_encoder is not None:
             proprio_encoder.train()
