@@ -48,6 +48,8 @@ class Wan22Trainer:
         self.max_grad_norm = float(cfg.max_grad_norm)
         self.seed = int(cfg.seed)
         self.trainable_modules = str(cfg.get("trainable_modules", "dit"))
+        backbone_lr = cfg.get("backbone_lr", None)
+        self.backbone_lr = float(backbone_lr) if backbone_lr is not None else None
 
         self.resume = cfg.resume
         self.mixed_precision = str(cfg.mixed_precision).strip().lower()
@@ -89,20 +91,54 @@ class Wan22Trainer:
         # most of the model is frozen).
         self._set_dit_only_train_mode()
         if self.trainable_modules == "dit":
-            trainable_params = list(self.model.dit.parameters())
+            optimizer_param_groups = [{"params": list(self.model.dit.parameters()), "lr": self.learning_rate}]
         elif self.trainable_modules == "expanded_projections_only":
             action_mixture = self.model.mot.mixtures["action"]
             trainable_params = list(action_mixture.action_encoder.parameters()) + list(
                 action_mixture.head.parameters()
             )
+            optimizer_param_groups = [{"params": trainable_params, "lr": self.learning_rate}]
+        elif self.trainable_modules == "dit_with_backbone_low_lr":
+            # Everything in `model.dit` (the full shared MoT/DiT backbone, both video
+            # and action experts) stays trainable -- nothing is frozen, unlike
+            # "expanded_projections_only" -- but split into two optimizer parameter
+            # groups with different learning rates: the action_encoder/head (the
+            # newly-widened, disjoint-offset projection layers) train at the full
+            # `learning_rate`, while the rest of the shared backbone trains at a much
+            # lower `backbone_lr`. This interpolates between "dit" (backbone_lr ==
+            # learning_rate, exp0001/exp0003's full-plasticity setting) and
+            # "expanded_projections_only" (backbone_lr == 0, exp0002/exp0004's full-
+            # freeze setting) instead of forcing an all-or-nothing choice -- see
+            # PROGRESS_0005 for why exp0004's evidence motivates this middle ground.
+            if self.backbone_lr is None:
+                raise ValueError(
+                    "`backbone_lr` is required when trainable_modules='dit_with_backbone_low_lr'."
+                )
+            action_mixture = self.model.mot.mixtures["action"]
+            projection_params = list(action_mixture.action_encoder.parameters()) + list(
+                action_mixture.head.parameters()
+            )
+            projection_param_ids = {id(p) for p in projection_params}
+            backbone_params = [
+                p for p in self.model.dit.parameters() if id(p) not in projection_param_ids
+            ]
+            optimizer_param_groups = [
+                {"params": backbone_params, "lr": self.backbone_lr},
+                {"params": projection_params, "lr": self.learning_rate},
+            ]
         else:
             raise ValueError(f"Unknown trainable_modules: {self.trainable_modules!r}")
         proprio_encoder = getattr(self.model, "proprio_encoder", None)
         if proprio_encoder is not None:
-            trainable_params.extend(list(proprio_encoder.parameters()))
+            # proprio_encoder is not part of `model.dit` (see FastWAM.__init__), so it
+            # is never included in the backbone/projection split above -- it always
+            # trains at the full `learning_rate`, matching every existing mode's
+            # treatment of it (exp0001-0004 all trained it at the flat learning_rate).
+            optimizer_param_groups.append(
+                {"params": list(proprio_encoder.parameters()), "lr": self.learning_rate}
+            )
         self.optimizer = torch.optim.AdamW(
-            trainable_params,
-            lr=self.learning_rate,
+            optimizer_param_groups,
             weight_decay=self.weight_decay,
             betas=(0.9, 0.95),
         )
@@ -342,6 +378,13 @@ class Wan22Trainer:
                 "Freezing shared MoT backbone; training only action_encoder/head/proprio_encoder."
             )
             self._apply_expanded_projections_only_train_mode(model)
+        elif self.trainable_modules == "dit_with_backbone_low_lr":
+            logger.info(
+                "Setting DiT to train mode (nothing frozen); backbone trains at a lower "
+                "LR than action_encoder/head via separate optimizer parameter groups "
+                "(see __init__)."
+            )
+            self._apply_dit_only_train_mode(model)
         else:
             raise ValueError(f"Unknown trainable_modules: {self.trainable_modules!r}")
 

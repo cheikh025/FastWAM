@@ -1,0 +1,62 @@
+# @package _global_
+#
+# exp0005 (PROGRESS_0005_disjoint_offset_backbone_low_lr): interpolates between
+# exp0003 (K=21/22 disjoint-offset projections, FULL backbone plasticity at the same
+# 3e-5 LR as the projections) and exp0004 (same disjoint-offset projections, backbone
+# FULLY FROZEN, 0 plasticity) via a differential learning rate instead of an
+# all-or-nothing freeze/train choice.
+#
+# Motivation (see research/progress/PROGRESS_0004_disjoint_offset_frozen_backbone.md
+# Section 9 for the full reasoning): the completed 2x2 matrix showed disjoint-offset
+# projections are a real, substantial fix (exp0002's overlapping+frozen 16.67% ->
+# exp0004's disjoint+frozen 63.33%), and that backbone-level drift is a second,
+# independent interference channel exp0004's full freeze eliminates -- but exp0004's
+# RoboTwin progress check also showed a fully frozen backbone can still learn some
+# real RoboTwin capability (click_alarmclock 33.3%/33.3%, the first non-zero
+# RoboTwin result in this project), while a fully trainable backbone (exp0001) has
+# never been shown to produce any RoboTwin capability at all despite presumably
+# having more representational room to adapt. This candidate asks: does giving the
+# backbone SOME plasticity (not zero, not full) preserve most of exp0004's retention
+# gain while unlocking more RoboTwin learning capacity (e.g. recovering
+# `adjust_bottle`, improving `click_alarmclock` further) than a full freeze allows?
+#
+# Mechanism: two optimizer parameter groups (Trainer.__init__,
+# trainable_modules="dit_with_backbone_low_lr") -- action_encoder/head/proprio_encoder
+# train at the full `learning_rate` (3e-5, same as every prior candidate's projection
+# LR), the rest of the shared MoT/DiT backbone trains at a much lower `backbone_lr`
+# (3e-5 / 10 = 3e-6). Nothing is frozen (unlike exp0002/exp0004); this differs from
+# exp0001/exp0003's "dit" mode only in giving the backbone its own, lower LR instead
+# of sharing the projections' LR. Verified via
+# research/tools/test_differential_backbone_lr_param_groups.py (parameter-group
+# disjointness/coverage, correct per-group LR assignment, and an end-to-end check
+# that the LR ratio actually takes effect during an optimizer step).
+#
+# Otherwise identical to exp0003/exp0004's data/model wiring, batch/schedule,
+# save_full_state, and eval-disabled settings.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: dit_with_backbone_low_lr
+backbone_lr: 3e-6
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
