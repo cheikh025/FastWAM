@@ -135,7 +135,33 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+8 steps, losses matching exp0004's smoke test exactly (`1.2713, 0.8180, 1.2406,
+1.6864, 2.2222, 1.3406, 1.2225, 1.5009` vs exp0004's `1.2713, 0.8076, ...` — tiny
+differences beyond step 1 are expected numerical noise, step-1 matches exactly
+confirming deterministic resume from the same checkpoint), no NaN/Inf. Confirmed
+via `Freezing shared MoT backbone; trainer.py:377` (appeared twice, pre/post-wrap)
+that exp0004's exact freezing mechanism applies unchanged. Checkpoint verified:
+shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf. Smoke-test run directory
+deleted after verification; log at `checkpoints/exp0006_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_frozen_backbone_4k_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1 \
+    save_every=500 \
+    wandb.name=exp0006_disjoint_offset_frozen_backbone_4k
+  ```
+- start time: 2026-08-18 ~08:50 UTC (immediately following the smoke test)
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0006_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0006.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
+- planned mid-run check: LIBERO-Spatial sentinel + RoboTwin 2-task progress check at step ~2000
 
 ## 7. Evaluation events
 
