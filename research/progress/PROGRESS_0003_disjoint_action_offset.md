@@ -247,6 +247,22 @@ not the action/proprio dimension. Smoke-test run directory deleted after verific
 - monitoring: persistent `Monitor` on the training log watching for checkpoint-save
   events, prune events, and failure signatures (Traceback/Error/NaN/OOM/disk-write-failure)
 
+### Training progress (check-in at step 350/1000)
+
+Healthy: losses well-behaved (`loss` 0.18-0.88, `loss_action` 0.05-0.70, no NaN/Inf,
+no spikes remotely like exp0001's step-5 5.02 outlier), `speed=0.27 step/s`,
+`eta=00:40:28` as of step 350. `step_000200.pt` checkpoint exists and is being
+correctly retained by the pruner (only one file present, matching `KEEP=1`). Disk
+steady at 34GB free.
+
+**Decision on early LIBERO-Spatial screening**: deferred rather than run now.
+All 4 GPUs are at 61-65GB/80GB from the active training job (~16-20GB free per
+GPU); the LIBERO eval loads the full model per worker (~14-20GB per
+`research/RUNBOOK.md`'s sizing note), so a parallel eval risks OOM-crashing either
+the eval or, worse, the training job itself. With training healthy and ~40 min from
+completing its full 1000-step budget, waiting for completion is safer than risking
+an expensive 4-GPU training run for an earlier partial-step checkpoint.
+
 ## 7. Evaluation events
 
 None yet.
