@@ -1,7 +1,7 @@
 # PROGRESS_0004 — disjoint-offset projections + frozen backbone
 
 - **Experiment ID:** 0004
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0003_disjoint_action_offset (rejected; this candidate reuses its checkpoint/config machinery with one variable changed)
@@ -54,7 +54,7 @@ Three multi-embodiment candidates tried so far, all rejected, none clearing the 
 | exp0001 | trainable | overlapping (K=14, both at offset 0) | 73.33% |
 | exp0002 | **frozen** | overlapping (K=14, both at offset 0) | 16.67% |
 | exp0003 | trainable | **disjoint** (K=21/22, LIBERO@0, RoboTwin@7/8) | 50.00% |
-| exp0004 (this candidate) | **frozen** | **disjoint** | ? |
+| exp0004 (this candidate) | **frozen** | **disjoint** | 63.33% |
 
 This candidate fills the missing cell in the 2x2 design. See
 `research/progress/PROGRESS_0003_disjoint_action_offset.md` Section 9 for the full
