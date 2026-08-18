@@ -179,3 +179,28 @@ General rule: only run a full-size LIBERO/RoboTwin eval concurrently with active
 training when the eval is expected to finish well inside one `save_every` interval
 at the observed `step/s`; otherwise use a smaller mid-run panel, or wait for
 training to complete.
+
+## RoboTwin eval gotcha — run_robotwin_manager.py ignores CUDA_VISIBLE_DEVICES remapping
+
+Every prior successful RoboTwin progress-check launch in this project pinned each
+task with `CUDA_VISIBLE_DEVICES=0` / `CUDA_VISIBLE_DEVICES=1` — which happens to be
+a no-op remap (physical GPU 0/1 map to local index 0/1 either way), so this never
+actually tested whether the manager *honors* the restriction. Attempting
+`CUDA_VISIBLE_DEVICES=2`/`=3` for the first time (to run two RoboTwin tasks on
+different physical GPUs than a concurrently-running LIBERO screen occupying GPUs
+0-1) failed: both jobs' Hydra overrides showed `gpu_id=0` and both actually
+allocated on **physical GPU 0** (per the OOM traceback's process list, matching
+LIBERO's own workers already there), not physical GPU 2/3 as the env var intended.
+`run_robotwin_manager.py`/`eval_robotwin_single.py` appears to resolve its GPU index
+independently of `CUDA_VISIBLE_DEVICES` (exact mechanism not yet traced) — the env
+var is not a reliable way to place a RoboTwin eval job on a specific non-zero
+physical GPU with this manager.
+
+**Consequence**: do not attempt to run a RoboTwin progress check on GPUs 2/3
+(or any non-0/1 pinning) concurrently with another job occupying GPUs 0/1 by
+setting `CUDA_VISIBLE_DEVICES` to a non-zero value — it will silently target
+GPU 0 anyway and can OOM against whatever's already there. Stick to the proven
+pattern (`CUDA_VISIBLE_DEVICES=0` and `=1` for the two RoboTwin tasks) and either
+run RoboTwin sequentially after any other GPU-occupying job finishes, or verify
+the manager's actual GPU-selection code path before trying a different pinning
+scheme.
