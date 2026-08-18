@@ -242,4 +242,37 @@ stopped cleanly; all 4 GPUs confirmed at 0MiB/0% after training exited.
     model.redirect_common_files=false
   ```
 - reference: exp0019 canonical 97.00%; exp0004 (step 1000, same recipe) 63.33%; exp0006 mid-run (step 1500, 1-trial) 80.00%
-- result: launched, awaiting completion — log at `checkpoints/exp0006_libero_screen_final.log` (pruner is stopped, no race risk this time)
+- **result: 63.33% (19/30)** — lands at the *exact same aggregate* as exp0004's step-1000 result and exp0005's step-1000 result (three separate candidates now converging on 19/30), despite 4x more training steps and the encouraging 80% mid-run (1-trial) signal at step 1500.
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_112827/`
+- runtime: ~35 minutes
+- per-task breakdown:
+
+  | Task | exp0004 (step 1000) | exp0006 mid-run (step 1500, 1-trial) | exp0006 final (step 4000, 3-trial) |
+  |---|---:|---:|---:|
+  | task0 "bowl between plate/ramekin" | 66.7% | 100% | 33.3% |
+  | task1 "bowl next to ramekin" | 0% | 0% | 33.3% |
+  | task2 "bowl from table center" | 100% | 100% | 100% |
+  | task3 "bowl on cookie box" | 66.7% | 100% | 100% |
+  | task4 "bowl in top drawer" | 0% | 0% | 0% |
+  | task5 "bowl on ramekin" | 66.7% | 100% | 33.3% |
+  | task6 "bowl next to cookie box" | 100% | 100% | 100% |
+  | task7 "bowl on stove" | 100% | 100% | 100% |
+  | task8 "bowl next to plate" | 100% | 100% | 100% |
+  | task9 "bowl on wooden cabinet" | 33.3% | 100% | 33.3% |
+  | **Overall** | **63.3%** | **80.0%** | **63.3%** |
+
+  The mid-run 80% signal did **not** hold up in the full 3-trial re-measurement —
+  most tasks that were a clean 100% on a single trial at step 1500 (0, 5, 9) landed
+  at only 33.3% under 3 trials by step 4000, meaning the single-trial mid-run panel
+  was optimistic (1/1 successes don't reveal a task's true multi-trial rate, and 3x
+  more trials naturally regress toward a lower, more representative number even with
+  no true underlying change). task4 remains 0% across **every** multi-embodiment
+  candidate measured so far.
+- decision enabled by this evidence: **the aggregate result did not improve with 4x
+  more training** — three separate candidates (exp0004, exp0005, exp0006) all land
+  at exactly 19/30 on this panel despite different training budgets/LR treatments,
+  which is a meaningfully strong signal that this specific recipe (frozen backbone,
+  6 trainable projection tensors, K=21/22 disjoint offset) has a real performance
+  ceiling around 63% on this task family, not merely noise. The RoboTwin evidence
+  (below) is the more decisive test of this candidate's actual purpose (more budget
+  -> more RoboTwin capability).
