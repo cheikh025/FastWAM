@@ -1,0 +1,48 @@
+# @package _global_
+#
+# exp0010 (PROGRESS_0010_libero_only_low_lr): exp0009's exact LIBERO-only
+# continued-training control, at a 10x lower learning rate (3e-6 instead of 3e-5).
+#
+# Motivation (see research/progress/PROGRESS_0009_libero_only_control.md Section 9):
+# exp0009 showed LIBERO-only continued training (zero RoboTwin exposure) still
+# destroys most of exp0019's inherited LIBERO-Spatial performance (97.00% -> 23.33%),
+# falsifying multi-embodiment interference as the primary cause of the retention
+# problem tested by every candidate since exp0002. Leading hypothesis: cold-start
+# Adam optimizer instability (weights-only resume restarts Adam's moment estimates
+# at zero; bias-correction amplifies effective step size for roughly the first
+# 10-50 steps against an already-converged solution) and/or the LR (3e-5) simply
+# being too high for continued fine-tuning of an already-converged checkpoint.
+#
+# This candidate directly tests that hypothesis with the single cheapest, most
+# direct lever: a 10x lower LR, everything else identical to exp0009 (same
+# LIBERO-only data, same K=21/22 disjoint-offset architecture, same full-trainable
+# backbone, same 1000-step budget). If retention holds up much better than
+# exp0009's 23.33% (ideally clearing or approaching exp0019's inherited
+# ~96.67-97.00%), this confirms LR/optimizer instability as the real driver, and the
+# practical fix for the whole project becomes "use a much lower LR for continued
+# fine-tuning" -- motivating revisiting the multi-embodiment candidates at a
+# corrected LR rather than continuing to chase interference mechanisms.
+
+defaults:
+  - override /data: libero_2cam_multiembodiment
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-6
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
