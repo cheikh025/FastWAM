@@ -39,6 +39,12 @@ Setup seeds only the inherited parent checkpoint/metrics already recorded in `re
 
 Public `yuanty/LIBERO-fastwam` dataset has no `libero_90_no_noops_lerobot` archive (only spatial/object/goal/10). No LIBERO-90 raw->lerobot conversion script exists in this repo. Blocks training-time LIBERO-90 replay/rehearsal design (does NOT block evaluation, which uses the official `libero` package's simulator/benchmark directly, not pre-recorded data).
 
+## In-loop eval crash — Trainer.evaluate() assumes a plain RobotVideoDataset
+
+`Trainer.evaluate()` (`src/fastwam/trainer.py:484`) does `processor = self.val_dataset.lerobot_dataset.processor`, assuming `val_dataset` is a plain `RobotVideoDataset`. For the multi-embodiment config, `data.val: null` -> `val_dataset = train_dataset` (a `ConcatDataset`), which has no `.lerobot_dataset` attribute — **crashed exp0001's real training run entirely at the first `eval_every` boundary (step 200), with zero checkpoint saved** (the in-loop eval runs before the `save_every` check in the training loop, so all 200 steps of progress were lost, not just the eval). Likely more single-embodiment assumptions exist deeper in `evaluate()` (rollout video shape, camera count) that a one-line fix wouldn't catch. **Fix applied for exp0001**: set `eval_every` very large (999999) to disable this in-loop qualitative PSNR/SSIM check entirely — real RoboTwin/LIBERO evaluation evidence comes from `$evaluate-fastwam-multiembodiment`'s dedicated managers, not this sanity-glance path, so disabling it costs little. Making `Trainer.evaluate()` multi-embodiment-aware (pick one embodiment's held-out sample explicitly, use its own shape_meta/processor) is a candidate for later, separate work — do not assume it's already handled by the padding/masking changes in `research/tools/`.
+
+**Lesson**: any single-embodiment code path not exercised by the loss/dataset/checkpoint-expansion unit tests (which is most of `Trainer`'s non-`training_loss` methods) should be treated as unverified for the multi-embodiment case until actually exercised end-to-end. `eval_every`/`save_every` boundaries are exactly where such gaps surface, often expensively (lost training progress), not gracefully.
+
 ## Disk crisis — RoboTwin's text-embedding cache is ~900GB, saturates the 1.1TB volume
 
 RoboTwin's 921,032 unique per-episode instructions (see below) each need a cached T5

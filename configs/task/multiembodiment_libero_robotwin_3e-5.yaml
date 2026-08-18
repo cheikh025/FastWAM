@@ -32,7 +32,17 @@ num_epochs: 1 # unused: max_steps below takes precedence in Wan22Trainer._estima
 max_steps: 1000 # small, conservative initial budget for the first mixed-embodiment run — not a promise to consume the whole budget; see $run-fastwam-training for progress-check-driven continuation/extension.
 log_every: 10
 save_every: 100
-eval_every: 200
+# eval_every: disabled (very large) for this candidate. Trainer.evaluate()'s in-loop
+# qualitative PSNR/SSIM sanity check assumes val_dataset is a plain RobotVideoDataset
+# (`self.val_dataset.lerobot_dataset.processor`) -- ours is a ConcatDataset (data.val
+# is null, so val_dataset falls back to the composite train_dataset), which crashed
+# training entirely at the first eval_every boundary with zero checkpoint saved (see
+# research/NOTES.md "In-loop eval crash"). Real RoboTwin/LIBERO evaluation happens via
+# $evaluate-fastwam-multiembodiment's dedicated managers, not this in-loop check, so
+# disabling it costs only a qualitative sanity glance, not real evaluation evidence.
+# Making Trainer.evaluate() multi-embodiment-aware is a candidate for later, separate
+# work (likely needs embodiment-aware sample selection, not just the one broken line).
+eval_every: 999999
 
 # save_full_state=false: skip the full DeepSpeed ZeRO state save (optimizer shards),
 # which is substantially larger than the weights-only checkpoint. Disk headroom on
