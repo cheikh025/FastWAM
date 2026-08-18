@@ -1,0 +1,53 @@
+# @package _global_
+#
+# exp0008 (PROGRESS_0008_disjoint_offset_3to1_ratio): combines the two most-validated
+# positive levers found so far -- disjoint-offset projections (proven, interference-
+# free fix for the shared-weight-column overlap that caused exp0001/exp0002's
+# regression; see PROGRESS_0003) and a full-trainable backbone (exp0001's setting,
+# the single best LIBERO retention result across all 7 candidates so far, 73.33% vs.
+# every disjoint-offset-frozen-backbone candidate's 56-63% ceiling) -- with a new,
+# previously-untested variable: a 3:1 LIBERO:RoboTwin batch-mixing ratio (was ~1:1 in
+# every prior candidate), via configs/data/multiembodiment_libero_robotwin_3to1.yaml.
+#
+# Motivation (see research/progress/PROGRESS_0007_exp0004_replication.md Section 9):
+# exp0007 confirmed a small total RoboTwin gradient budget (~500 realized steps under
+# 1:1 interleaving over 1000 total steps) already produces real, if modest and noisy,
+# RoboTwin capability (click_alarmclock ~10-30%). This suggests RoboTwin's own
+# learning need is not step-budget-starved even at a diluted ratio -- so shifting more
+# of the total budget toward LIBERO rehearsal (3x more LIBERO batches per RoboTwin
+# batch) may protect LIBERO retention (which has never approached the 90% floor in
+# any candidate) without necessarily sacrificing RoboTwin's already-modest capability.
+#
+# This also revisits exp0003's design (disjoint offset + trainable backbone, 1:1
+# ratio, 50.00% LIBERO -- worse than exp0001 despite the interference fix) with the
+# ratio as the new variable: does biasing the mix toward LIBERO rescue retention
+# toward exp0001's 73.33% (or beyond) while the disjoint-offset fix keeps whatever
+# RoboTwin capability the recipe can produce free of projection-level interference?
+#
+# Otherwise identical to exp0003's data/model wiring (K=21/22 disjoint offset),
+# batch/LR/schedule, save_full_state, and eval-disabled settings -- full fine-tune,
+# no freezing (`trainable_modules` unset, defaults to "dit").
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_3to1
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
