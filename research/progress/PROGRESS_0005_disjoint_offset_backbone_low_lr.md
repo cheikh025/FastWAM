@@ -132,7 +132,37 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+8 steps, sane losses matching exp0003/exp0004's smoke-test step-1 loss exactly
+(`1.2713`, confirming deterministic forward-pass reproducibility given the same
+resumed checkpoint), no NaN/Inf. Confirmed via log line "Setting DiT to train mode
+(nothing frozen); backbone trains at a lower LR..." (appeared twice, pre- and
+post-`accelerator.prepare()`) that the new `dit_with_backbone_low_lr` mode's
+freeze/train-mode setting was applied correctly (nothing frozen, unlike
+exp0002/exp0004). The logged `lr=` value tracks `optimizer.param_groups[0]`
+(the backbone group, since it's listed first) — started at `2.90e-06` (near
+`backbone_lr=3e-6` after 1 warmup step) and decayed toward the shared `eta_min`
+floor by step 8 (an artifact of the smoke test's tiny 8-step schedule, not a
+concern for the real 1000-step run). Checkpoint verified: shapes
+`(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf. Smoke-test run directory deleted
+after verification; log at `checkpoints/exp0005_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_backbone_low_lr_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0005_disjoint_offset_backbone_low_lr_v1 \
+    save_every=200 \
+    wandb.name=exp0005_disjoint_offset_backbone_low_lr
+  ```
+- start time: 2026-08-18 ~07:17 UTC (immediately following the smoke test)
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0005_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0005.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
 
 ### Known minor imprecision (not a bug, documented for interpretation)
 
