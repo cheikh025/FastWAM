@@ -8,7 +8,7 @@
 - **Parent checkpoint:** `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` (same expanded checkpoint used for exp0003/exp0004 — reused)
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
-- **Git commit:** pending
+- **Git commit:** `a5be226` (implementation); `d168d8f` (final result)
 
 ## 1. Result at a glance
 
@@ -112,7 +112,7 @@ trainable (not frozen) but at `backbone_lr=3e-6` instead of the full
 
 ## 4. Exact code and configuration state
 
-- Git commit: pending (recorded after committing this report + code/config changes together, before training launch)
+- Git commit: `a5be226`
 - Git branch: `autoresearch/robotwin-multiembodiment-v1`
 - parent code commit: `06efae2` (exp0004 RoboTwin-result commit)
 - working tree clean/dirty before launch: will be clean at commit time
