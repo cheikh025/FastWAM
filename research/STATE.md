@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0007 confirmed exp0004's RoboTwin capability is real (not noise); designing exp0008 (LIBERO-favoring mixing ratio)`
+Status: `RESEARCH_LOOP_ACTIVE — exp0008 training (disjoint-offset + trainable backbone + 3:1 LIBERO:RoboTwin ratio, testing the first-ever mixing-ratio variable)`
 
 ## Inherited parent reference
 
