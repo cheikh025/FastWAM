@@ -47,9 +47,22 @@ Old research-memory guard:
 - **`save_full_state: false` is required for candidates training on RoboTwin data on this hardware** — `Trainer`'s unconditional full DeepSpeed ZeRO state save (optimizer shards) will not fit alongside RoboTwin's ~900GB text-embedding cache; see "Disk crisis" in `research/NOTES.md`. Default remains `true` (unchanged) for configs not affected by this constraint.
 - important version compatibility notes: FastWAM's venv is fully separate from the base image's `/venv/main`; do not `source /venv/main/bin/activate` for any FastWAM/LIBERO/RoboTwin work. `pip` on `PATH` resolves to the system `/usr/bin/pip`, not the venv's — always use `uv pip` (with the two env vars above) or the venv's `python3 -m pip` to avoid installing into the wrong environment. nvcc 12.8 present at `/usr/local/cuda/bin/nvcc`, matches the torch cu128 wheel, needed for RoboTwin's CUDA source builds (pytorch3d, curobo). GPU render capability confirmed available (`gl`, `optix`, `vulkan` all true per `vast-capabilities`). **`model.redirect_common_files=false` is a required standing override on every eval/training command** (default `true` points at a dead HF repo — see `research/NOTES.md`). **`MULTIRUN.max_tasks_per_gpu<=2` for LIBERO eval on these A100-80GBs** (each full-model worker uses ~14-20GB; 5/GPU OOMs, 2/GPU is safe) — likely also relevant to sizing concurrent RoboTwin eval workers and multi-embodiment training batch/worker counts later. LIBERO evaluator's `RoboTwin` counterpart (SAPIEN) shares the same venv and was verified compatible.
 
-## Inherited parent checkpoint
+## Current parent checkpoint (since exp0011 — supersedes the exp0019 section below)
 
-Recorded parent:
+The project's parent checkpoint changed in `exp0011` (`research/progress/PROGRESS_0011_expansion_zeroinit_fix_and_parent_switch.md`): `exp0019` was found to be seed-sensitive/fragile specifically on LIBERO-Spatial after checkpoint expansion (not a general problem, not a computational bug — verified via a full-model output-equivalence test showing exact 0.0 diff either way). The parent is now the **official FastWAM LIBERO release checkpoint**:
+
+- local path: `checkpoints/fastwam_release/libero_uncond_2cam224.pt` (from `https://huggingface.co/yuanty/fastwam`, downloaded via the `huggingface-cli download yuanty/fastwam ...` command in the repo README's "Inference with Released Checkpoints" section)
+- paired stats: `checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json`
+- file size: 12,041,735,140 bytes
+- zero-init expanded (K=21/22) copy: `/home/claudeuser/local_cache/fastwam_release_expanded_zeroinit/step_000000.pt` (produced with `research/tools/expand_checkpoint_for_multiembodiment.py`'s current, fixed zero-init default — commit `631df95`)
+- checkpoint format/keys: identical structure to the `exp0019` checkpoint documented below (`mot` state dict, `step`, `torch_dtype`, `proprio_encoder`) — this format understanding transfers directly.
+- LIBERO evidence so far: see `research/STATE.md` "Release-checkpoint LIBERO evidence so far" (Spatial expanded 96-97% across three runs/two seeds; native and Object/Goal/Long baseline in progress as of `exp0012`).
+
+The remaining checkpoint-expansion/multi-embodiment mechanics (disjoint offsets, masked loss, `pretrained_norm_stats` usage, no `embodiment_description` default) documented throughout this runbook are architecture-level and apply unchanged to the new parent.
+
+## Superseded: exp0019 parent checkpoint record (historical, no longer the active parent)
+
+Recorded parent (now abandoned — see above):
 
 `runs/reweighted_libero90_finetune/exp0019_spatial_weak_task_oversample/checkpoints/weights/step_005000.pt`
 
@@ -361,7 +374,7 @@ Suites:
 Fixed settings:
 
 - trials per task: `EVALUATION.num_trials: 50` (matches the inherited "50 trials/task" canonical record).
-- task membership: **`MULTIRUN.task_suite_names` default list is `[libero_10, libero_goal, libero_spatial, libero_object]` — `libero_90` is NOT included by default** and must be requested explicitly (`task_suite_name=libero_90`, or add to the multirun override list) to cover all five suites. Must fix this explicitly every canonical run.
+- task membership: **`MULTIRUN.task_suite_names` default list is `[libero_10, libero_goal, libero_spatial, libero_object]` — `libero_90` is NOT included by default** and must be requested explicitly (`task_suite_name=libero_90`, or add to the multirun override list) if it's ever needed. Since `exp0011`, LIBERO-90 is explicitly out of scope for this project's goal (see `CLAUDE.md`), so the default four-suite list is exactly the canonical set to use — do not add `libero_90` to routine runs.
 - seeds/initial-state behavior: not yet separately verified (uses LIBERO's own benchmark init-state files by default).
 - episode horizon: not yet separately verified (`num_steps_wait: 30` warmup steps recorded; full episode horizon not yet read from code).
 - prompt/instruction behavior: not yet separately verified beyond the T5 text-embedding pipeline shared with training.
@@ -463,7 +476,7 @@ Expected cost/runtime:
 A checkpoint can be promoted only after:
 
 1. canonical RoboTwin evaluation under the frozen protocol; and
-2. canonical evaluation on all five LIBERO benchmarks showing each >=90%.
+2. canonical evaluation on all four in-scope LIBERO benchmarks (Spatial, Object, Goal, Long) showing each >=90% (LIBERO-90 out of scope since `exp0011`).
 
 ### Targeted diagnostic panels
 
