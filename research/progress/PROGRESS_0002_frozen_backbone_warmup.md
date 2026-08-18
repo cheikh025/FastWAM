@@ -1,7 +1,7 @@
 # PROGRESS_0002 — frozen_backbone_warmup
 
 - **Experiment ID:** 0002_frozen_backbone_warmup
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0001_padded_multiembodiment_baseline
@@ -73,23 +73,88 @@ Identical to `PROGRESS_0001` Section 5.
 
 ## 6. Training execution and control timeline
 
-TBD.
+- exact launch command (final, after a disk-full crash mid-run — see "Training anomalies"):
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_frozen_backbone_3e-5 \
+    resume=runs/reweighted_multiembodiment/exp0002_frozen_backbone_warmup/checkpoints/weights/step_000200.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0002_frozen_backbone_warmup_v2 \
+    max_steps=800 save_every=100
+  ```
+  (first attempt: `resume=checkpoints/exp0019_expanded_k14/step_005000.pt`, `max_steps=1000`, crashed disk-full at step ~300; resumed from the valid step_200 weights with `max_steps=800` to preserve the total 1000-step budget)
+- start time: 2026-08-18 02:33:04 UTC (first attempt); 02:49:57 UTC (resumed attempt)
+- end time: 2026-08-18 03:30:26 UTC
+- wall-clock runtime: ~26 min (first attempt, to step 200) + ~41 min (resumed, 200->800) = ~67 min total for 1000 effective steps
+- exit code/status: clean (`max_steps reached step=800`, no errors)
+- steps completed: 1000/1000 effective (200 + 800 across two launches)
+- throughput: ~0.36-0.42 step/s (similar to exp0001, as expected — see Section 8)
+- important losses/diagnostics: loss `0.6486` at step 800 (fluctuating 0.4-2.2 over the run, generally declining — action_encoder/head/proprio_encoder converging from a partially-adapted state), no NaN/Inf in the final checkpoint (1649/1649 mot tensors clean).
+- training log: `checkpoints/exp0002_train_v2.log`
+
+### Training anomalies
+
+Same disk-full checkpoint-save crash pattern as exp0001, recurring for a specific, identified reason: the reused pruner script's `KEEP=2` was too generous for the ~34GB headroom actually available (2 kept x 12GB + 1 being written x 12GB = 36GB > 34GB). Fixed by using `KEEP=1` and a faster 15s poll interval (vs. 60s) for the resumed run; recovered by resuming from the last valid checkpoint (step_200, verified loadable first) rather than restarting from exp0019. Full detail and the general `(KEEP+1) x checkpoint_size` sizing rule now in `research/NOTES.md` "Disk crisis".
 
 ## 7. Evaluation events
 
-TBD.
+### Event 1 — `candidate_screen` (LIBERO-Spatial retention sentinel — same panel as exp0001)
+
+- benchmark: `libero`
+- checkpoint / training step: exp0002, step 800 (1000 effective steps)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0002_frozen_backbone_warmup_v2/checkpoints/weights/step_000800.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0002_frozen_backbone_warmup_v2/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2
+  ```
+- reference: exp0019 canonical 97.00%; setup sentinel 96.67% (29/30); **exp0001 (same panel) 73.33% (22/30)**
+- **candidate result: 16.67% (5/30) — WORSE than exp0001, not better.** This is the opposite of the leading hypothesis's prediction.
+- per-task breakdown:
+
+  | Task | exp0019 setup sentinel | exp0001 | exp0002 (frozen backbone) |
+  |---|---:|---:|---:|
+  | task0 "bowl between plate/ramekin" | 100% | 66.7% | 66.7% |
+  | task1 "bowl next to ramekin" | 100% | 100% | **0%** |
+  | task2 "bowl from table center" | 100% | 100% | 33.3% |
+  | task3 "bowl on cookie box" | 100% | 100% | 33.3% |
+  | task4 "bowl in top drawer" | 66.7% | 0% | 0% |
+  | task5 "bowl on ramekin" | 100% | 33.3% | 0% |
+  | task6 "bowl next to cookie box" | 100% | 66.7% | 0% |
+  | task7 "bowl on stove" | 100% | 66.7% | 0% |
+  | task8 "bowl next to plate" | 100% | 100% | 33.3% |
+  | task9 "bowl on wooden cabinet" | 100% | 100% | 0% |
+
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_033143/`
+- runtime: ~37 minutes
+- validity checks: 10/10 task result files present, correct checkpoint path/step in `summary.json`, correct (freshly recomputed, distinct-filename) LIBERO stats used.
+- decision enabled by this evidence: **`DIAGNOSE`** (again) — the leading hypothesis (unmasked video loss corrupting the shared backbone) is not supported by this result: freezing the backbone made retention *worse*, and the backbone was, by construction, held byte-identical to exp0019's for this entire run. Since the backbone is provably unchanged, **whatever is hurting LIBERO here must be entirely within the 6 trainable tensors: `action_encoder`, `head`, `proprio_encoder`.**
+- reason: this is a genuinely surprising result relative to the literature-motivated prediction, and demands re-diagnosis before choosing the next candidate — see Section 8/10.
 
 ## 8. Comparison and interpretation
 
-TBD.
+**The backbone-freezing hypothesis is refuted by this evidence.** With the entire shared MoT backbone held frozen (byte-identical to exp0019), LIBERO-Spatial retention got *worse* (73.33% -> 16.67%), not better. Since the backbone cannot have changed, the cause must be in the 6 trainable tensors themselves.
+
+**Leading re-diagnosis**: `action_encoder` (Linear 14->1024 in) and `head` (Linear 1024->14 out) are **shared weight matrices whose first 7 columns/rows are used by LIBERO and whose full 14 are used by RoboTwin — these ranges overlap, they are not disjoint.** LIBERO's masked loss correctly prevents *LIBERO's own* gradient from touching columns 7-13 (the padding-only region for LIBERO), but nothing prevents *RoboTwin's* gradient from updating columns 0-6 — the exact columns LIBERO depends on, since RoboTwin's valid range is the full 0-13. Every RoboTwin training step directly overwrites part of the same weight positions LIBERO needs, via plain gradient descent on a shared matrix. In exp0001 (full fine-tune), this same channel overlap existed, but the interference was diluted across ~5B other trainable parameters, and the (also-being-trained) backbone had freedom to adapt around the shifting encoder/head outputs. In exp0002, with *only* these 6 tensors trainable and the backbone frozen (no downstream plasticity to compensate), 100% of both embodiments' gradient signal concentrates on these small shared matrices with nothing to absorb the resulting representational shift — making the direct channel-overlap interference *more* visible, not less.
+
+This reframes the problem: it is not (primarily) a video-backbone/world-model interference issue. It is a **projection-layer weight-sharing** issue — LIBERO's 7 valid channels and RoboTwin's 14 valid channels are not actually independent in the current design, because they occupy overlapping column/row *positions* (both start at index 0) in `action_encoder`/`head`, even though the *loss* is correctly masked per-embodiment.
 
 ## 9. Decision
 
-TBD.
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (not evaluated this candidate — LIBERO result alone already rejects it; no point spending RoboTwin compute on a candidate worse than its own rejected predecessor)
+- **All five LIBERO >=90% canonical:** no (16.67% sentinel, far below floor)
+- **Reason:** worse LIBERO retention than the already-rejected exp0001, with a frozen backbone that provably could not be the cause — the hypothesis this candidate tested is refuted, and the evidence points to a different, more specific mechanism (shared projection-layer columns) that needs a different fix.
+- **Checkpoint/branch to preserve:** none; not promoted, diagnostic value fully captured here.
+- **Next main-line parent:** unchanged — exp0019 (expanded to K=14).
 
 ## 10. What this changes for the next experiment
 
-TBD.
+The next candidate needs to address channel-position overlap in `action_encoder`/`head` directly, not just freeze/unfreeze the backbone. Two concrete directions to weigh:
+
+1. **Per-embodiment gradient masking on the projection layers themselves** (not just the loss): during a LIBERO batch, zero out gradients to `action_encoder`'s/`head`'s weight columns/rows beyond index 7 is already implicit (LIBERO's padded input is exactly zero there, contributing no gradient — this part is fine); the actual gap is the reverse — during a RoboTwin batch, prevent gradient from updating columns 0-6 that LIBERO depends on. This requires an explicit per-embodiment weight mask at the optimizer/gradient level (e.g. a backward hook zeroing specific column/row gradients depending on which embodiment produced the batch), not something `ConcatLeftAlign`'s existing padding/masking touches.
+2. **Give each embodiment its own, non-overlapping projection weights** into/out of the shared hidden space (e.g. `action_encoder_libero: Linear(7,1024)`, `action_encoder_robotwin: Linear(14,1024)`, selected per-batch by embodiment, both feeding the *same* shared 1024-dim action transformer) — closer to how several real multi-embodiment systems avoid this exact interference, and avoids needing custom gradient-masking machinery. This is a more direct interface change than the flat K=14-padded-shared-projection approach, but may be the more robust fix.
+
+Option 2 is likely simpler to implement correctly and verify (no custom autograd hooks, easy to unit-test "LIBERO's projection weights are literally never touched by a RoboTwin gradient" the same way the action-dim masking was verified) — recommended as the next candidate's core change, keeping everything else (K=14 shared *transformer* hidden space, per-channel loss masking within each embodiment's own natural dim, embodiment-conditioned prompts, interleaved batch mixing) as-is.
 
 ## 11. Artifacts
 

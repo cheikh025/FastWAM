@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0002 running`
+Status: `RESEARCH_LOOP_ACTIVE — exp0002 rejected, diagnosing next candidate`
 
 ## Inherited parent reference
 
@@ -62,7 +62,7 @@ Not yet measured for any accepted checkpoint. exp0001 (rejected) measured 0.0% o
 
 ### LIBERO retention
 
-Inherited canonical record (above) stands for the accepted parent (exp0019). exp0001 (rejected) showed LIBERO-Spatial dropping to 73.33% (3-trial sentinel) — see exp0001 below.
+Inherited canonical record (above) stands for the accepted parent (exp0019). exp0001 (rejected): LIBERO-Spatial 73.33%. exp0002 (rejected): LIBERO-Spatial **16.67%, worse than exp0001** — see below, this refuted the leading hypothesis.
 
 ## Best useful branch candidates
 
@@ -70,18 +70,19 @@ None yet — `autoresearch/robotwin-multiembodiment-v1` is the sole active branc
 
 ## Latest experiment
 
-`0002_frozen_backbone_warmup` — `RUNNING`. Full report: `research/progress/PROGRESS_0002_frozen_backbone_warmup.md`.
+`0002_frozen_backbone_warmup` — `REJECT`. Full report: `research/progress/PROGRESS_0002_frozen_backbone_warmup.md`. Next candidate not yet chosen — see "Current research notes" for the leading re-diagnosis.
 
 ## Experiment history
 
 - `0000_parent_baseline` — `PROMOTE` (setup baseline, not a research candidate).
-- `0001_padded_multiembodiment_baseline` — `REJECT`. Full fine-tune (no freezing), K=14 padded interface, ~1:1 LIBERO:RoboTwin interleaving, 1000 steps. Result: LIBERO-Spatial 96.67%->73.33% (real regression, concentrated on exp0019's already-weakest tasks), RoboTwin 0.0% across all measurements. Root-caused (via `$investigate-fastwam-problem`) to the video-denoising loss not being per-embodiment-masked — RoboTwin's very different visual domain directly trains the shared backbone LIBERO's video generation depends on, compounded by no freezing. The padding/masking/expansion mechanisms themselves are independently verified correct (14/14 unit tests) — only the training recipe was rejected. Full report: `research/progress/PROGRESS_0001_padded_multiembodiment_baseline.md`.
-- `0002_frozen_backbone_warmup` — `RUNNING`. Freezes the entire shared MoT backbone, trains only the newly-expanded `action_encoder`/`head`/`proprio_encoder` (verified: exactly 6 trainable tensors, 1841 frozen). Same 1000-step budget, same data mixture as exp0001 — isolates `trainable_modules` as the only changed variable, direct test of the interference hypothesis.
+- `0001_padded_multiembodiment_baseline` — `REJECT`. Full fine-tune (no freezing), K=14 padded interface, ~1:1 LIBERO:RoboTwin interleaving, 1000 steps. Result: LIBERO-Spatial 96.67%->73.33%, RoboTwin 0.0%. Initially attributed to the unmasked video-denoising loss training the shared backbone on RoboTwin's visual domain. Full report: `research/progress/PROGRESS_0001_padded_multiembodiment_baseline.md`.
+- `0002_frozen_backbone_warmup` — `REJECT`. Froze the entire shared MoT backbone (byte-identical to exp0019 by construction), trained only `action_encoder`/`head`/`proprio_encoder` (6 tensors). Result: LIBERO-Spatial dropped further to **16.67%** — worse than exp0001, despite the backbone provably being unchanged. **This refutes the backbone-interference hypothesis.** Re-diagnosis: `action_encoder`/`head` are shared weight matrices whose LIBERO-valid columns (0-6) and RoboTwin-valid columns (0-13) *overlap* — RoboTwin's gradient directly overwrites the same weight positions LIBERO depends on, and with the backbone frozen there's no downstream plasticity to absorb the shift (in exp0001 this same overlap existed but was diluted across ~5B other trainable params). Full report: `research/progress/PROGRESS_0002_frozen_backbone_warmup.md`.
 
 ## Current research notes
 
 - Implementation groundwork from setup (still current): `ConcatLeftAlign` padding (K=14) is now actively used (was previously unwired); `fastwam.utils.losses.masked_action_loss` implements the two-level per-channel masked loss (wired into both `fastwam.py` and `fastwam_idm.py`); `research/tools/expand_checkpoint_for_multiembodiment.py` grows exp0019's projections to K=14 preserving inherited weights exactly.
-- **New since exp0001**: `Trainer.trainable_modules` config option (`"dit"` [default] | `"expanded_projections_only"` [new, exp0002]) for selective backbone freezing.
+- `Trainer.trainable_modules` config option (`"dit"` [default] | `"expanded_projections_only"` [exp0002]) for selective backbone freezing — mechanism works correctly (verified 6 trainable/1841 frozen tensors) but did not fix retention; kept in the codebase as reusable infrastructure, not the active recipe.
+- **Leading open hypothesis (not yet tested)**: `action_encoder`/`head`'s shared weight *columns/rows* overlap between embodiments (both start at index 0 — LIBERO valid 0-6, RoboTwin valid 0-13), so RoboTwin's gradient directly overwrites the same positions LIBERO depends on regardless of loss masking. Two candidate fixes considered in `PROGRESS_0002` Section 10: (a) per-embodiment gradient masking on the projection layers, or (b) separate, non-overlapping per-embodiment projection weights into the shared hidden space (`action_encoder_libero`/`action_encoder_robotwin`, etc.) — likely simpler to implement and verify. Next candidate should test this.
 - **Known open gap**: no downloadable LIBERO-90 lerobot-format training data exists in the public FastWAM dataset (only Spatial/Object/Goal/Long-10) — blocks LIBERO-90 replay/rehearsal design specifically; does not block LIBERO-90 *evaluation*.
 - **Known open gap**: RoboTwin's exact per-arm action-channel semantics (delta vs. absolute; per-arm layout) still not confirmed against RoboTwin's own env code.
 - **Disk is a hard, recurring constraint**: RoboTwin's 921k unique per-episode instructions require a ~900GB text-embedding cache (already computed, do not delete), leaving very little of the 1.1TB volume for training checkpoints. `save_full_state=false` is required (skips DeepSpeed optimizer-state saves); an active background pruner keeping only 1 checkpoint at a time is required during real training runs (see `research/NOTES.md` "Disk crisis" and its operational addenda — the exact pruner pattern and its race-condition pitfall are documented there).
