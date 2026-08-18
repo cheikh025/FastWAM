@@ -146,6 +146,8 @@ def main(cfg: DictConfig):
     if not robotwin_root.exists():
         raise FileNotFoundError(f"RoboTwin root not found: {robotwin_root}")
 
+    clean_only = bool(cfg.EVALUATION.get("clean_only", False))
+
     num_gpus = int(cfg.MULTIRUN.num_gpus)
     if num_gpus <= 0:
         raise ValueError("`MULTIRUN.num_gpus` must be > 0.")
@@ -371,7 +373,7 @@ def main(cfg: DictConfig):
                 f"success_rate={success_rate:.4f}"
             )
 
-            if state.phase == "clean":
+            if state.phase == "clean" and not clean_only:
                 running_states.append(launch_phase(
                     task_name=state.task_name,
                     gpu_id=gpu_id,
