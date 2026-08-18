@@ -39,6 +39,48 @@ Setup seeds only the inherited parent checkpoint/metrics already recorded in `re
 
 Public `yuanty/LIBERO-fastwam` dataset has no `libero_90_no_noops_lerobot` archive (only spatial/object/goal/10). No LIBERO-90 raw->lerobot conversion script exists in this repo. Blocks training-time LIBERO-90 replay/rehearsal design (does NOT block evaluation, which uses the official `libero` package's simulator/benchmark directly, not pre-recorded data).
 
+## Disk crisis — RoboTwin's text-embedding cache is ~900GB, saturates the 1.1TB volume
+
+RoboTwin's 921,032 unique per-episode instructions (see below) each need a cached T5
+context tensor at `[context_len=128, text_dim=4096]` bf16 ≈ 1MB/file — **921k files ≈
+900GB total** (`data/text_embeds_cache/robotwin/`, confirmed via `du`). Combined with
+RoboTwin's raw 75GB training data, LIBERO's 8.9GB, and ~26GB of essential model
+components (Wan-AI T5/VAE + the expanded exp0019 checkpoint), this leaves very little
+of the 1.1TB volume for anything else — **a real DeepSpeed full-state checkpoint save
+(optimizer shards) during exp0001's first live training smoke test filled the disk to
+100% and crashed mid-save** (`PytorchStreamWriter failed writing file: file write
+failed`), even though all 8 training steps themselves completed successfully with
+sane losses.
+
+**Trimming the cache is not a safe fix**: `RobotVideoDataset.__getitem__` has a
+single-retry fallback (catches a cache-miss `FileNotFoundError`, retries once with a
+random other index) — but freeing meaningful space would require deleting the large
+majority of the 921k files, making a *double*-miss (uncaught, crashes training) likely
+rather than rare. The retry is only enough headroom for occasional gaps, not bulk
+deletion.
+
+**Actual fix applied**: (1) added `save_full_state: bool` to `Trainer` (default
+`true`, preserves existing behavior everywhere) — when `false`, `save_checkpoint()`
+skips `accelerator.save_state()` (the large optimizer-shard save) and only writes the
+much smaller weights-only `.pt` file; set `save_full_state: false` in
+`configs/task/multiembodiment_libero_robotwin_3e-5.yaml` for this disk-constrained
+exploratory candidate (weights-only resume is well-tested, see "Reload/resume smoke"
+above; losing exact optimizer-momentum continuation is an acceptable tradeoff for a
+short, low-LR exploratory run, not for a long production run). (2) Freed 24GB by
+deleting `checkpoints/exp0019_parent_hf/` and `checkpoints/fastwam_release/` — both
+safely re-downloadable (durably backed up on `cheikh025/ASR` / `yuanty/fastwam`
+respectively; exact re-download commands are in `research/RUNBOOK.md`). (3) Deleted
+disposable `runs/_smoke_test/` artifacts after extracting their log evidence.
+
+**For future candidates using RoboTwin**: budget disk carefully — the 900GB text
+cache is a fixed, unavoidable cost once computed (do not delete it casually, it's
+expensive multi-GPU-hours to regenerate), so essentially all remaining volume space
+must go to raw data + one candidate's live checkpoints at a time. Prune old
+intermediate weights checkpoints aggressively as new ones are written (matches the
+disk-pressure lesson already noted in exp0019's own history), and prefer
+`save_full_state: false` unless a specific candidate genuinely needs exact
+optimizer-state continuation.
+
 ## Hardware sizing — max concurrent full-model workers per A100-80GB
 
 Each FastWAM eval worker (LIBERO or presumably RoboTwin) loads a full model instance using ~14-20GB. `MULTIRUN.max_tasks_per_gpu=5` (the manager's apparent default) OOMs on an 80GB A100; `max_tasks_per_gpu=2` is safe (confirmed empirically — 2 workers x ~20GB = ~41GB used, comfortable headroom). Use `<=2` per GPU for LIBERO/RoboTwin eval on this hardware; treat as a starting point for sizing concurrent multi-embodiment training workers too.

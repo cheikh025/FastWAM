@@ -41,6 +41,7 @@ class Wan22Trainer:
         self.max_steps = int(max_steps) if max_steps is not None else None
         self.log_every = int(cfg.log_every)
         self.save_every = int(cfg.save_every)
+        self.save_full_state = bool(cfg.get("save_full_state", True))
         self.eval_every = int(cfg.eval_every)
         self.eval_num_inference_steps = int(cfg.eval_num_inference_steps)
         self.gradient_accumulation_steps = int(cfg.gradient_accumulation_steps)
@@ -624,12 +625,22 @@ class Wan22Trainer:
             ckpt_path = self._save_weights_checkpoint(step_tag=step_tag)
         self.accelerator.wait_for_everyone()
 
-        state_path = os.path.join(self.state_dir, step_tag)
-        ensure_dir(state_path)
-        self.accelerator.save_state(output_dir=state_path)
-        if self.accelerator.is_main_process:
-            self._save_trainer_state(state_path)
-        self.accelerator.wait_for_everyone()
+        state_path = None
+        if self.save_full_state:
+            # Full DeepSpeed ZeRO state (optimizer shards etc.) is substantially larger
+            # than the weights-only checkpoint and only needed for exact-continuation
+            # resume. `save_full_state=false` skips it -- weights-only resume is
+            # well-tested (see research/RUNBOOK.md "Reload/resume smoke") and
+            # sufficient when disk headroom is tight or exact optimizer-state
+            # continuation isn't required (e.g. a short exploratory candidate run).
+            state_path = os.path.join(self.state_dir, step_tag)
+            ensure_dir(state_path)
+            self.accelerator.save_state(output_dir=state_path)
+            if self.accelerator.is_main_process:
+                self._save_trainer_state(state_path)
+            self.accelerator.wait_for_everyone()
+        else:
+            logger.info("save_full_state=false: skipping full DeepSpeed state save at %s", step_tag)
 
         return {"weights_path": ckpt_path, "state_path": state_path}
 

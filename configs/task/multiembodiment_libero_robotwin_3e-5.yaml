@@ -34,6 +34,15 @@ log_every: 10
 save_every: 100
 eval_every: 200
 
+# save_full_state=false: skip the full DeepSpeed ZeRO state save (optimizer shards),
+# which is substantially larger than the weights-only checkpoint. Disk headroom on
+# this candidate is dominated by RoboTwin's 921k-unique-instruction text-embedding
+# cache (~900GB, see research/RUNBOOK.md) with little room left for repeated
+# full-state saves. Weights-only resume is well-tested (setup's reload/resume smoke
+# test) and sufficient for this exploratory candidate; exact optimizer-state
+# continuation is not required here.
+save_full_state: false
+
 # training
 weight_decay: 1e-2
 resume: null
