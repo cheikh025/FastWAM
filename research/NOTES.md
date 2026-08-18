@@ -148,3 +148,34 @@ explicitly on every RoboTwin eval command for a multi-embodiment checkpoint — 
 auto-discovery. (The eval script's auto-discovery logic itself was not modified — fixing it to
 also try the renamed filenames would be a reasonable follow-up but wasn't needed once the
 explicit override is used.)
+
+## Mid-training eval gotcha — checkpoint pruner races with a concurrent LIBERO screen
+
+Running a LIBERO candidate_screen (10 tasks, 3 trials, `MULTIRUN.max_tasks_per_gpu=1`
+or `2`) **concurrently** with an active training run's `KEEP=1` checkpoint pruner is
+unsafe: a full 10-task/3-trial screen genuinely takes ~33-40 minutes wall-clock
+end-to-end (confirmed across exp0003-0005's screens) regardless of
+`max_tasks_per_gpu`, since per-task simulation+inference time is the bottleneck, not
+raw worker parallelism. If the training run's `save_every` cadence (at its observed
+`step/s`) produces a new checkpoint faster than the eval finishes, the pruner deletes
+the checkpoint the eval is actively reading mid-run once the newer one appears —
+confirmed directly in exp0006 (mid-run screen against `step_001000.pt`; pruner
+deleted it at a ~19-minute mark once `step_001500.pt` was saved, ~4 min into the
+eval; 2 of 10 tasks had already completed, the 3rd crashed with a checkpoint-load
+failure, aborting the whole `run_libero_manager.py` scheduler on the first failure).
+
+**Fix used for exp0006's recovery**: for a *mid-run* progress check specifically
+(not the final/candidate_screen evaluation), use a much smaller, faster panel —
+`EVALUATION.num_trials=1` instead of `3` (10 episodes instead of 30, ~3x faster,
+reliably finishes inside a typical ~19-minute save-cadence window) — rather than
+fighting the pruner (increasing `KEEP` risks exceeding the ~34-45GB disk headroom
+this project operates under; stopping the pruner for the eval's duration risks the
+same). A 1-trial/task panel is noisier but adequate for a
+`CONTINUE_TRAINING`/`STOP_TRAINING`-level decision; it is not a substitute for the
+full 3-trial `candidate_screen` run against the *final* checkpoint once training
+finishes (when there's no longer a moving pruner target to race against).
+
+General rule: only run a full-size LIBERO/RoboTwin eval concurrently with active
+training when the eval is expected to finish well inside one `save_every` interval
+at the observed `step/s`; otherwise use a smaller mid-run panel, or wait for
+training to complete.
