@@ -1,0 +1,67 @@
+# @package _global_
+#
+# exp0006 (PROGRESS_0006_disjoint_offset_frozen_backbone_4k): exp0004's exact recipe
+# (frozen backbone, K=21/22 disjoint-offset projections -- the best LIBERO retention
+# among candidates with any measured RoboTwin capability, 63.33% Spatial, first
+# non-zero RoboTwin success anywhere in this project) run for 4x the training budget
+# (4000 steps instead of 1000), unchanged otherwise.
+#
+# Motivation (see research/progress/PROGRESS_0005_disjoint_offset_backbone_low_lr.md
+# Section 9): exp0005 tested whether trading some backbone-freeze protection for
+# backbone plasticity (a different LR ratio, same 1000-step budget) would unlock
+# more RoboTwin capability -- it did not; RoboTwin capability got strictly worse
+# (click_alarmclock's randomized-phase success vanished) for no LIBERO gain. This
+# points at training BUDGET, not the LR-ratio dial, as the more likely relevant
+# lever: exp0004's frozen backbone left the shared MoT/DiT representations
+# completely untouched (byte-identical to exp0019), so all of RoboTwin's ~500
+# realized gradient steps (given ~1:1 LIBERO:RoboTwin batch interleaving over 1000
+# total steps) went entirely into the 6 trainable projection tensors
+# (action_encoder/head/proprio_encoder) -- a small, fast-to-saturate parameter
+# budget that may simply need more exposure to build a more complete/robust mapping
+# from RoboTwin's action/proprio space through the (frozen, LIBERO-only-trained)
+# shared representations, rather than needing the representations themselves to
+# adapt. This also directly follows the standing project instruction to eventually
+# try longer training runs (4k/8k steps) once a working retention-preserving recipe
+# exists -- exp0004's frozen+disjoint recipe is exactly that starting point.
+#
+# What this tests: (1) does LIBERO-Spatial retention hold near exp0004's 63.33% (or
+# degrade) under 4x more RoboTwin gradient exposure through the same 6 trainable
+# tensors -- if the interference mechanism is purely the projection-layer overlap
+# already fixed by the disjoint offset, retention should hold; (2) does RoboTwin
+# capability meaningfully improve (recover adjust_bottle, strengthen
+# click_alarmclock) given more steps for those 6 tensors to converge.
+#
+# Identical to configs/task/multiembodiment_libero_robotwin_disjoint_offset_frozen_backbone_3e-5.yaml
+# (exp0004's data/model wiring, `trainable_modules: expanded_projections_only`,
+# batch/LR/schedule, save_full_state, eval disabled) except `max_steps: 4000` and a
+# wider `save_every` (disk headroom is unaffected either way -- the KEEP=1 pruner
+# bounds usage regardless of total step count -- 500 is chosen simply to keep the
+# number of intermediate checkpoints manageable across a 4x longer run, giving 8
+# save points including a natural midpoint at step 2000 for a progress check before
+# committing the full budget).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: expanded_projections_only
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 4000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
