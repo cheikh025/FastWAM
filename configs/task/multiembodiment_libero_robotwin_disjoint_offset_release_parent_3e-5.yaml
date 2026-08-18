@@ -1,0 +1,47 @@
+# @package _global_
+#
+# exp0013 (PROGRESS_0013): first real multi-embodiment training candidate on the new
+# release-checkpoint parent (see PROGRESS_0011 -- exp0019 was abandoned as parent
+# after being found seed-sensitive/fragile on LIBERO-Spatial once expanded).
+#
+# Otherwise identical to multiembodiment_libero_robotwin_disjoint_offset_3e-5.yaml
+# (exp0003's architecture: full fine-tune, disjoint K=21/22 offsets, 1:1 LIBERO:RoboTwin
+# ratio, LR 3e-5) -- reusing the same design since exp0003 established it as the best
+# retention/RoboTwin-capability tradeoff among the tested variants on the old exp0019
+# lineage, and the multi-embodiment padding/masking architecture itself is
+# checkpoint-agnostic. `configs/data/multiembodiment_libero_robotwin.yaml` was fixed
+# in PROGRESS_0011/commit 66d8d32 (embodiment_description removed, LIBERO
+# pretrained_norm_stats now points at the release checkpoint's own paired stats), so
+# this candidate automatically inherits those fixes without any further config change.
+#
+# Batch size raised from 1 to 2 (gradient_accumulation_steps correspondingly halved to
+# keep the same effective global batch: 2*4*4=32, unchanged from 1*4*4=16 -> actually
+# doubled to 32) to test better GPU utilization per user feedback -- validate via smoke
+# test before committing to the full run; exp0019's own proven native recipe used
+# batch_size=4, so there is real headroom above the original batch_size=1 smoke-test
+# floor (which was itself only ever validated on a much more memory-constrained
+# multi-embodiment-inclusive smoke test with a different codepath).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 2
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 4000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
