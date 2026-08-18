@@ -1,7 +1,7 @@
 # PROGRESS_0005 — disjoint-offset projections + low-LR backbone
 
 - **Experiment ID:** 0005
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0004_disjoint_offset_frozen_backbone (rejected; this candidate directly extends its reasoning)
@@ -12,7 +12,17 @@
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (1000/1000 steps, no NaN/anomalies). LIBERO-Spatial
+candidate_screen: **63.33% (19/30)** — lands exactly at exp0004's aggregate
+result (different per-task mix). The RoboTwin progress check is the real story:
+**partial backbone plasticity made things worse, not better.** `adjust_bottle`
+stayed dead (0.0%/0.0%, unchanged from exp0004), and `click_alarmclock` *lost*
+its randomized-phase capability entirely (33.3% -> 0.0%), keeping only its
+clean-phase result. This directly contradicts the candidate's own hypothesis
+(that some plasticity would unlock more RoboTwin learning while costing little
+retention) — instead it cost real RoboTwin robustness for no LIBERO or RoboTwin
+gain in return. **Decision: `REJECT`.** See Section 7 for full results and
+Section 9 for the investigation this surprising result triggered.
 
 ## 2. Research state before experiment
 
@@ -221,6 +231,49 @@ NaN/Inf, `step: 1000`. Training log: `checkpoints/exp0005_train.log`.
   informative signal for whether partial backbone plasticity was worth trading
   for.
 
+### Evaluation event — RoboTwin `progress_check`
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0005, step 1000
+- decision this evaluation was meant to inform: does giving the backbone some
+  plasticity (10x lower LR, not fully frozen) unlock more RoboTwin learning
+  capacity than exp0004's full freeze, per this candidate's core hypothesis?
+- exact task/difficulty coverage: same 2-task panel as exp0001/exp0004
+  (`adjust_bottle`, `click_alarmclock`), `demo_clean` and `demo_randomized`
+- trials/episodes: 3 per task per phase
+- exact command (per-task, pinned to separate GPUs):
+  ```bash
+  CUDA_VISIBLE_DEVICES=<0|1> python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0005_disjoint_offset_backbone_low_lr_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0005_disjoint_offset_backbone_low_lr_v1/robotwin_dataset_stats.json \
+    EVALUATION.task_name=<adjust_bottle|click_alarmclock> EVALUATION.eval_num_episodes=3 \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+- **result**:
+
+  | Task | Clean | Randomized | exp0004 Clean | exp0004 Randomized |
+  |---|---:|---:|---:|---:|
+  | `adjust_bottle` | 0.0% (0/3) | 0.0% (0/3) | 0.0% | 0.0% |
+  | `click_alarmclock` | 33.3% (1/3) | **0.0% (0/3)** | 33.3% | **33.3%** |
+
+**This is the opposite of the hoped-for effect.** The whole premise of exp0005 was
+that some backbone plasticity would preserve most of exp0004's RoboTwin capability
+while unlocking more (ideally recovering `adjust_bottle`). Instead, `adjust_bottle`
+remained exactly as dead as before (0%/0%), and `click_alarmclock` *lost* its
+randomized-phase capability entirely (33.3% -> 0.0%) while keeping its clean-phase
+result unchanged. Partial backbone plasticity did not help RoboTwin learn more; on
+this evidence it made the one real capability the recipe had *more fragile*
+specifically under domain randomization, without gaining anything in return.
+- raw results path: `evaluate_results/robotwin/reweighted_multiembodiment_exp0005_disjoint_offset_backbone_low_lr_v1/20260818_082314/{adjust_bottle,click_alarmclock}/_result_{clean,random}.txt`
+- runtime: ~29 minutes total
+- validity checks: correct checkpoint path in every launch command; `unseen`
+  instruction type; both clean and randomized phases completed for both tasks
+  (`manager finished successfully` for each); `EVALUATION.dataset_stats_path`
+  passed explicitly per the known auto-discovery gap (`research/NOTES.md`).
+- decision enabled by this evidence: **`DIAGNOSE`** — this result needs its own
+  investigation before choosing exp0006, since it contradicts this candidate's
+  own hypothesis rather than just failing to confirm it. See Section 9.
+
 ### Known minor imprecision (not a bug, documented for interpretation)
 
 `Trainer._build_scheduler`'s `CosineAnnealingLR(..., eta_min=self.learning_rate * 0.01)`
@@ -239,3 +292,49 @@ exploratory candidate.
 ## 7. Evaluation events
 
 None yet.
+
+## 8. Decision
+
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (progress-check grade only, 2 of 50 tasks)
+- **All five LIBERO >=90% canonical:** no (63.33% Spatial sentinel, below floor)
+- **Reason:** LIBERO retention matches exp0004 (no gain), and RoboTwin capability is strictly worse (click_alarmclock lost its randomized-phase success; adjust_bottle unchanged at 0%). The candidate's core hypothesis — that partial backbone plasticity trades a little retention for more RoboTwin learning capacity — is not supported; on this evidence it costs RoboTwin robustness for nothing in return.
+- **Checkpoint/branch to preserve:** none; not promoted. Checkpoint removed after evidence capture.
+- **Next main-line parent:** unchanged — exp0019.
+
+## 9. What this changes for the next experiment
+
+This result needs investigation before choosing exp0006, since it contradicts
+exp0005's own hypothesis rather than merely failing to confirm it. Two questions
+matter most:
+
+1. **Is exp0004's `click_alarmclock` 33.3%/33.3% itself just noise?** The entire
+   comparison rests on n=3-episode measurements. A single flipped episode outcome
+   moves a task's score by 33.3 percentage points. It is entirely possible exp0004
+   and exp0005 have genuinely similar (near-zero, high-variance) real capability on
+   `click_alarmclock`'s randomized phase, and the 33.3% vs 0.0% difference is
+   consistent with typical sampling noise at this trial count rather than a real
+   regression caused by backbone plasticity.
+2. **If it is real, why would *more* backbone plasticity make an already-fragile
+   RoboTwin skill *more* fragile, not more capable?** A plausible mechanism: at only
+   1000 steps and a 1:1 LIBERO:RoboTwin batch ratio, RoboTwin's own action/video
+   pathway has had very little total gradient exposure regardless of backbone LR
+   (~500 RoboTwin batches either way). Letting the backbone drift at all — even at
+   3e-6 — may destabilize the *shared* representations `click_alarmclock`'s barely-
+   learned success depended on (which, per exp0004's result, apparently worked using
+   the frozen, exp0019-inherited visual/temporal backbone as-is), without giving
+   RoboTwin's own components enough additional gradient signal in the same budget to
+   build something more robust to compensate. This would suggest the training
+   budget itself, not just the backbone-plasticity dial, is a live variable: the
+   backbone-plasticity idea might still be worth revisiting with either (a) many
+   more steps for the RoboTwin/action pathway to actually benefit from the extra
+   backbone capacity, or (b) an explicit retention anchor (e.g. an auxiliary loss
+   keeping the backbone's LIBERO-relevant activations close to the frozen exp0019
+   values) rather than an unconstrained low-LR drift.
+
+Recommend `$investigate-fastwam-problem` next, specifically to weigh question 1
+(estimate whether n=3-episode RoboTwin measurements are informative enough to
+distinguish these candidates at all, e.g. by re-running exp0004's `click_alarmclock`
+randomized phase with more episodes to see if 33.3% replicates) against question 2
+(design a next candidate around more training budget or an explicit retention
+mechanism, rather than another LR-ratio value on the same 1000-step budget).
