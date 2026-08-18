@@ -124,7 +124,20 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_frozen_backbone_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0007_replication_v1 \
+    save_every=200 \
+    wandb.name=exp0007_exp0004_replication
+  ```
+- start time: 2026-08-18 ~12:20 UTC
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0007_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0007.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log
+- no smoke test run this time — this is exp0004's exact, already-repeatedly-verified recipe (same code path exercised successfully in exp0004 and exp0006), not a new code/config path
 
 ## 7. Evaluation events
 
