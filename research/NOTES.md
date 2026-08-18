@@ -246,3 +246,41 @@ runtime prompt string. Check whether a cache needs recomputing *before* launchin
 run whenever `embodiment_description` or similar instruction-augmentation settings change --
 don't assume the cache is still valid just because the underlying raw task/instruction data
 didn't change.
+
+### Second gotcha found while fixing the above — `scripts/precompute_text_embeds.py` cross-writes every prompt into every discovered cache directory
+
+Running the recompute against the *combined* multi-embodiment task config
+(`multiembodiment_libero_robotwin*`) nearly filled the entire 1.1TB `/workspace` volume in
+under two minutes (27GB free -> 740K free) and had to be killed. Root cause: `_collect_dataset_settings`
+unions *all* dataset_dirs and *all* cache_dirs discovered anywhere in `cfg.data` into two flat
+lists, then the write loop does `for cache_dir in cache_dirs: ...` for *every* encoded prompt --
+so every LIBERO prompt gets written into RoboTwin's cache dir and every RoboTwin prompt gets
+written into LIBERO's, not just each embodiment's own directory. Against the combined config
+(921,072 total prompts, ~912k of them RoboTwin's) this meant writing roughly 2x the intended
+volume, growing far faster than the expected ~900GB single-pass total. The custom
+`research/tools/precompute_multiembodiment_text_embeds.py`'s own docstring already documented
+this exact limitation of the shared script ("a flat prompt-list x cache-dir-list design, fine
+when every dataset node wants the identical prompt set, but not when different embodiments need
+different... prompts cached to different directories") -- worth re-reading before reaching for
+the generic script against a multi-embodiment config again.
+
+**Fix**: run the precompute once per embodiment, using a task config scoped to only that
+embodiment's data (e.g. `task=robotwin_uncond_3cam_384_multiembodiment_eval`, which composes
+only `data: robotwin_multiembodiment`, not the combined config) -- this way
+`_collect_dataset_settings` only discovers one dataset_dir set and one cache_dir per invocation,
+and there is no cross-writing.
+
+**Also recovered from**: the stale (embodiment_description-prefixed) RoboTwin cache and the
+partial cross-written mess from the killed run were both cleared with
+`rm -rf ./data/text_embeds_cache/robotwin` before relaunching scoped -- safe because every
+filename in that directory is content-addressed (SHA256 of the prompt string), so nothing
+outside that directory could have referenced them, and a clean re-run reconstructs exactly what's
+needed. LIBERO's cache directory picked up some harmless-but-wasted extra files from the same
+killed cross-write (RoboTwin prompts cached under `./data/text_embeds_cache/libero/`, ~23GB) --
+left in place since they don't break anything, just waste some space; safe to clean up later if
+disk pressure returns.
+
+**Standing lesson**: when running any large batch/precompute job for the first time against a
+new/changed config, actively monitor `df -h` during the run (not just after), especially for any
+job whose write volume scales with a large discovered list -- don't assume "the same script
+worked fine before" transfers to "it'll behave the same against a different config shape."
