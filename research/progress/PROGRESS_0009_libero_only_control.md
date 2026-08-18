@@ -1,18 +1,29 @@
 # PROGRESS_0009 — LIBERO-only continued-training control
 
 - **Experiment ID:** 0009
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0008_disjoint_offset_3to1_ratio (rejected; this candidate directly answers the open question from its Section 9)
 - **Parent checkpoint:** `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` (same expanded checkpoint used for exp0003-0008 — reused)
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
-- **Git commit:** pending
+- **Git commit:** `ff61b1b` (implementation); see Section 7 for follow-on commits
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (1000/1000 steps, no NaN/anomalies, notably low final
+loss `0.0878`). LIBERO-Spatial: **23.33% (7/30) — the second-worst result of any
+candidate in the project, despite ZERO RoboTwin exposure of any kind.** This is a
+decisive finding: it falsifies the "multi-embodiment interference" framing as the
+*primary* cause of the retention problem that has driven every candidate since
+exp0002 (projection overlap, backbone drift, mixing ratio). Continuing to fine-tune
+this expanded/padded K=21/22 checkpoint degrades LIBERO retention substantially
+even with no other embodiment present at all. **Decision: `REJECT`** (obviously —
+this was never intended as a promotable candidate, only a diagnostic control), but
+this redirects the whole research direction. See Section 9 for the new leading
+hypothesis (optimizer/LR instability from continued fine-tuning, not embodiment
+interference) and exp0010's design.
 
 ## 2. Research state before experiment
 
@@ -167,4 +178,113 @@ collision/`stats_filename` override needed).
 
 ## 7. Evaluation events
 
-None yet.
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0009, step 1000
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0009_libero_only_control_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0009_libero_only_control_v1/dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0019 canonical 97.00% / fresh-machine sentinel 96.67%; 90% floor; every multi-embodiment candidate's 16.67-73.33% range
+- **result: 23.33% (7/30) — the second-worst result of any candidate in the project (only exp0002's 16.67% is lower), and this candidate had ZERO RoboTwin exposure of any kind.**
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_161833/`
+- runtime: ~36 minutes
+- per-task breakdown: 0% on tasks 0, 1, 4, 7, 8, 9 (6 of 10 tasks); 33.3-66.7% on tasks 2, 3, 5, 6. Task4 (the persistently-weakest task across every candidate, including the baseline's own 66.7%) is 0% here too, consistent.
+
+**This is a definitive, decisive finding.** LIBERO-only continued training — with
+literally no other embodiment present, no mixing ratio, no projection-overlap
+possibility, no shared-backbone cross-embodiment drift — still destroys most of
+exp0019's inherited LIBERO-Spatial performance (97.00% -> 23.33%). This directly
+falsifies the "multi-embodiment interference" framing as the *primary* cause of the
+retention problem that has driven candidate selection since exp0002. Whatever is
+happening is a property of continuing to fine-tune this specific expanded/padded
+K=21/22 checkpoint — RoboTwin's presence in the mixture (at any ratio tested,
+1:1 or 3:1) was never the dominant factor; every multi-embodiment candidate's
+retention loss was, at minimum, *substantially* attributable to this same
+underlying continued-training instability, not to embodiment interference per se.
+- decision enabled by this evidence: `DIAGNOSE` — this redirects the entire research
+  direction. See Section 9.
+
+## 8. Decision
+
+- **Decision:** `REJECT` (diagnostic control, never intended for promotion)
+- **Canonical RoboTwin evidence available:** n/a (RoboTwin never in training or evaluation for this candidate)
+- **All five LIBERO >=90% canonical:** no (23.33% Spatial sentinel, far below floor — second-worst of any candidate)
+- **Reason:** confirms the retention problem is not primarily a multi-embodiment interference phenomenon — it persists, severely, with zero RoboTwin exposure. Not a candidate for promotion; its purpose was diagnostic.
+- **Checkpoint/branch to preserve:** none. Checkpoint removed after evidence capture.
+- **Next main-line parent:** unchanged — exp0019.
+
+## 9. What this changes for the next experiment
+
+This is the most important finding of the research loop so far. Every candidate
+since exp0002 has framed the LIBERO retention problem as caused by
+*multi-embodiment interference* — shared projection weight-column overlap
+(exp0002/0003), backbone drift from RoboTwin's visual domain (exp0004-0006),
+backbone-plasticity dosage (exp0005), or mixing ratio (exp0008). exp0009 shows that
+framing was, at best, addressing a secondary contributor: **a LIBERO-only continued
+training run, with no RoboTwin present at all, degrades LIBERO-Spatial to 23.33% —
+worse than 6 of the 8 multi-embodiment candidates.** Whatever is destroying
+performance is a property of *continuing to fine-tune this specific
+expanded/padded K=21/22 checkpoint*, not of embodiment interference.
+
+### Leading hypothesis: continued-training/optimizer instability, not interference
+
+The most likely concrete mechanism, given the evidence:
+
+1. **Cold-start Adam optimizer state.** Every candidate resumes *weights only*
+   (`save_full_state: false`, and more fundamentally the *initial* resume in every
+   candidate loads only weights with no prior optimizer state at all — this run
+   starts Adam's moment estimates at zero). Adam's bias-correction term
+   (`m_hat = m/(1-beta1^t)`, `v_hat = v/(1-beta2^t)`) amplifies effective step size
+   for the first ~1/(1-beta) steps after a cold start (here `beta1=0.9`, so
+   meaningfully inflated for roughly the first ~10-50 steps, with residual effects
+   longer). Applied to an *already-converged* solution (exp0019's LIBERO-only
+   optimum) at a non-trivial LR (`3e-5`, matching exp0019's own *continuation*
+   fine-tuning LR — but exp0019 presumably had its own warmed/tuned optimizer state
+   throughout its training, not a cold restart), this could produce disruptive
+   early updates that knock the solution off its optimum before the loss signal has
+   a chance to pull it back — especially since the widened action_encoder/head/
+   proprio_encoder columns are freshly initialized and initially contribute large,
+   noisy gradients that (via any shared computation, e.g. the LayerNorm/residual
+   paths inside the DiT blocks) could inject noise into otherwise-converged
+   backbone parameters even for LIBERO's own forward pass.
+2. **LR itself may simply be too high for continued fine-tuning of an
+   already-converged checkpoint**, independent of the cold-start issue — 1000
+   steps at `3e-5` with a full trainable backbone is a substantial optimization
+   budget relative to how close exp0019 already was to its own local optimum.
+3. **The checkpoint expansion/widening itself** (K=7/8 -> K=21/22) may alter loss
+   landscape/gradient-norm scale in a way that interacts poorly with fixed
+   hyperparameters (LR, warmup fraction, gradient-clip norm) tuned for the
+   original K=7/8 architecture, independent of (1)/(2).
+
+None of these are new *architecture* ideas — they are training-recipe/optimization
+hypotheses, a different axis entirely from anything tested in exp0001-0008.
+
+### Recommended exp0010
+
+A LIBERO-only run (same setup as exp0009, isolating the true cause from
+multi-embodiment confounds) at a **much lower learning rate** (e.g. `3e-6`, 10x
+lower, or lower) — directly testing hypothesis (1)/(2) above. This is the simplest,
+cheapest, most directly diagnostic next step: if a 10x-lower LR preserves LIBERO
+retention close to exp0019's inherited ~96.67-97.00% (or at least clears 90%), that
+confirms optimizer/LR instability (not interference) as the real driver, and the
+practical fix for the whole project becomes "use a much lower LR for continued
+fine-tuning" rather than any of the architecture/mixing interventions tried so far
+— which could then be revisited at the corrected LR. If a 10x-lower LR *still*
+degrades LIBERO substantially, the cause is something else entirely (e.g. the
+checkpoint-expansion process itself, or a more fundamental instability), and a
+different diagnostic (e.g. checking gradient norms/per-parameter update magnitudes
+directly during a short LIBERO-only run) would be the next step.
+
+## 10. Artifacts
+
+- training log: `checkpoints/exp0009_train.log`
+- smoke test log: `checkpoints/exp0009_smoke_train.log`
+- LIBERO screen log: `checkpoints/exp0009_libero_screen.log`
+- LIBERO screen raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_161833/`
+- expanded parent checkpoint used: `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt`
