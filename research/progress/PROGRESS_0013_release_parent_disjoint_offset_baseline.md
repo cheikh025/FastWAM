@@ -1,7 +1,7 @@
 # PROGRESS_0013 — First real multi-embodiment training candidate on the release-checkpoint parent
 
 - **Experiment ID:** 0013
-- **Status:** `RUNNING` (smoke test in progress as this report is created)
+- **Status:** `RUNNING` (real training launched, max_steps=4000)
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0012 (release-checkpoint LIBERO/RoboTwin baseline establishment)
@@ -105,6 +105,28 @@ Not applicable — setup already validated; no infrastructure changes this candi
 - First attempt failed immediately on a Hydra config error (`Could not override 'data@task.data'`) — the new task config was missing the `# @package _global_` directive at the top of the file (present in every other task config, omitted by mistake when authoring this one). Fixed, no research-design impact.
 - Second attempt: crashed a few minutes in (past model construction, mid-dataloading) with `FileNotFoundError: Missing text embedding cache` for RoboTwin samples. Root cause: `PROGRESS_0011`'s removal of `embodiment_description` changed the runtime prompt string `augment_instruction()` produces, invalidating the entire RoboTwin text-embedding cache (originally precomputed *with* the embodiment_description prefix baked into the hash by a dedicated custom script). Full writeup in `research/NOTES.md` ("Training gotcha — removing `embodiment_description` stales the RoboTwin text-embedding cache"). Not a research-design issue — a real, one-time infra consequence of the PROGRESS_0011 fix that nobody had triggered yet (eval doesn't touch this cache).
 - Fix in progress: recomputing the full text-embedding cache (all 921,072 discovered prompts, LIBERO redundantly but harmlessly included) via the generic `scripts/precompute_text_embeds.py` (now correct now that `embodiment_description` is gone) — `torchrun --standalone --nproc_per_node=4 scripts/precompute_text_embeds.py task=multiembodiment_libero_robotwin_disjoint_offset_release_parent_3e-5`, log `checkpoints/exp0013_precompute_text_embeds.log`. Expected ~35-40 minutes (matches the original precompute's timing). Smoke test will be re-attempted once this completes.
+- Third precompute attempt caused a near-total disk exhaustion (27GB -> 740KB free in under 2 minutes): root cause was the generic precompute script's cross-write design flaw (writes every discovered prompt into every discovered `cache_dir`) run against the *combined* multiembodiment task config, compounded by not having deleted the stale RoboTwin cache first. Recovered via emergency `rm -rf data/text_embeds_cache/robotwin` + relaunch scoped to the RoboTwin-only task config (`robotwin_uncond_3cam_384_multiembodiment_eval`). Full writeup in `research/NOTES.md`. A disk-monitor script used during recovery had its own bug (an `999999`-sentinel "previous reading" placeholder caused a false-positive anomaly-kill on the very first real check, killing a healthy job) — fixed with an empty-string sentinel that skips the drop-check on the first iteration.
+- Second smoke test (`batch_size=2`, 6 steps) completed cleanly once the RoboTwin cache was rebuilt: losses ranged 0.95-1.74 (noisy at 6 steps with a fast-decaying cosine LR, as expected), peak GPU memory ~24GB/80GB (comfortable headroom), checkpoint saved and independently verified: file size 12,041,907,845 bytes (~12.04GB, matching the parent checkpoint's ~12.04GB almost exactly), 1649 `mot` tensors sharing exactly 1 underlying storage buffer (consistent with DeepSpeed's flat-parameter representation), ~6.02B total params, and direct value comparison against the parent checkpoint showed near-identical weights (max abs diff ~0.000122, mean ~5e-5, no NaN/Inf) -- confirming a genuine, correctly-trained, non-corrupted save. (An earlier `ls -la` reading of 312,896 bytes on this same file was a transient artifact of checking mid-write, before the ~12GB flush completed; superseded by the corrected reading above.)
+- Smoke-test run directory (`runs/_smoke_test/exp0013_release_parent/`) deleted after verification to reclaim its ~12GB.
+
+### Disk budget for real training
+
+Checkpoints are genuinely ~12GB each. With `save_every=200` over `max_steps=4000` (20 possible saves) and only ~35GB free on `/workspace` (97% full, 1.1TB volume), an unpruned run would need ~240GB -- far more than available. Per the established project pattern (`research/NOTES.md` "Disk crisis" section), required pruner headroom is `(KEEP+1) x checkpoint_size_GB`. With ~35GB free: `KEEP=1` needs ~24GB (safe margin), `KEEP=2` needs ~36GB (too tight, matches the exact failure mode that hit exp0002). **Chose `KEEP=1`.** A background pruner (`while kill -0 $TRAIN_PID; do sleep 15; ls -1t weights/step_*.pt | tail -n +2 | xargs -r rm -f; done`) runs alongside training, polling every 15s (fast enough to close the race window given a ~12GB write completes well under 60s on this hardware). This means only the single most recent checkpoint is retained locally during training -- any checkpoint worth keeping for evaluation/continuation must be evaluated or copied out before the next save arrives, or persisted to `cheikh025/ASR` first.
+
+### Real training launch
+
+- exact launch command:
+  ```bash
+  source /workspace/venvs/fastwam/bin/activate
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_release_parent_3e-5 \
+    resume=/home/claudeuser/local_cache/fastwam_release_expanded_zeroinit/step_000000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1 \
+    model.skip_dit_load_from_pretrain=true model.action_dit_pretrained_path=null model.redirect_common_files=false
+  ```
+- log: `checkpoints/exp0013_train.log`
+- pruner log: `checkpoints/exp0013_pruner.log`
+- First launch attempt failed immediately with `accelerate: command not found` -- used the base image's `/venv/main` instead of this project's dedicated venv (`/workspace/venvs/fastwam`, per `research/RUNBOOK.md`'s Environment section: FastWAM's venv is fully separate from `/venv/main`, which carries an incompatible torch 2.11). Fixed and relaunched with `source /workspace/venvs/fastwam/bin/activate`; no research-design impact.
+- budget: `max_steps=4000`, `batch_size=2`, `gradient_accumulation_steps=4` (effective global batch 32), `save_every=200`, `save_full_state=false`, LR `3e-5` cosine, resuming from the zero-init-fixed expanded release checkpoint.
 
 ## 7. Evaluation events
 
@@ -124,5 +146,7 @@ Pending.
 
 ## 11. Artifacts
 
-- smoke test log: `checkpoints/exp0013_smoke_train.log`
+- smoke test log: `checkpoints/exp0013_smoke_train.log`, `checkpoints/exp0013_smoke_train_v2.log`
+- real training log: `checkpoints/exp0013_train.log`
+- pruner log: `checkpoints/exp0013_pruner.log`
 - task config: `configs/task/multiembodiment_libero_robotwin_disjoint_offset_release_parent_3e-5.yaml`

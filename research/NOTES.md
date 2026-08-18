@@ -101,6 +101,8 @@ disk-pressure lesson already noted in exp0019's own history), and prefer
 `save_full_state: false` unless a specific candidate genuinely needs exact
 optimizer-state continuation.
 
+**exp0013 real-training recurrence**: with only ~35GB free at launch time (worse than exp0002's ~34GB), the arithmetic (`(KEEP+1) x 12GB`) forced `KEEP=1` (~24GB headroom) rather than `KEEP=2` (~36GB, would not have fit). This means only the single most-recent checkpoint survives locally at any time during training -- any checkpoint worth keeping for evaluation, continuation, or promotion must be evaluated/copied out or uploaded to `cheikh025/ASR` before the *next* `save_every` cadence overwrites it. Used the PID-based pruner form (`while kill -0 $TRAIN_PID; do ...; done`) rather than string-matching the run's `pgrep -f` pattern -- a `pgrep -f "<pattern>"` check matches the grep invocation's own argv when the pattern string appears in it, causing a false "still running" read after the real process has already exited (harmless here since it only delays the pruner's own clean exit, but worth avoiding for correctness).
+
 ## Hardware sizing — max concurrent full-model workers per A100-80GB
 
 Each FastWAM eval worker (LIBERO or presumably RoboTwin) loads a full model instance using ~14-20GB. `MULTIRUN.max_tasks_per_gpu=5` (the manager's apparent default) OOMs on an 80GB A100; `max_tasks_per_gpu=2` is safe (confirmed empirically — 2 workers x ~20GB = ~41GB used, comfortable headroom). Use `<=2` per GPU for LIBERO/RoboTwin eval on this hardware; treat as a starting point for sizing concurrent multi-embodiment training workers too.
