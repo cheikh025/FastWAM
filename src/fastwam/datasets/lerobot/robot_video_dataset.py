@@ -42,6 +42,7 @@ class RobotVideoDataset(torch.utils.data.Dataset):
         max_padding_retry: int = 3,
         concat_multi_camera: str = "horizontal", # "horizontal", "vertical", "robotwin", or None
         override_instruction: Optional[str] = None, # whether to hardcode a specific instruction for all samples, for debugging
+        stats_filename: str = "dataset_stats.json", # override to avoid collisions when multiple RobotVideoDataset instances share one work_dir (e.g. fastwam.datasets.lerobot.multi_embodiment)
     ):
         self.lerobot_dataset = BaseLerobotDataset(
             dataset_dirs=dataset_dirs,
@@ -92,7 +93,7 @@ class RobotVideoDataset(torch.utils.data.Dataset):
                     logger.info("Calculating dataset stats for normalization...")
                     dataset_stats = self.lerobot_dataset.get_dataset_stats(processor)
                     work_dir = misc.get_work_dir()
-                    save_dataset_stats_to_json(dataset_stats, os.path.join(work_dir, "dataset_stats.json"))
+                    save_dataset_stats_to_json(dataset_stats, os.path.join(work_dir, stats_filename))
                 else:
                     dataset_stats = None
                 if torch.distributed.is_available() and torch.distributed.is_initialized():
@@ -104,7 +105,7 @@ class RobotVideoDataset(torch.utils.data.Dataset):
                 logger.info(f"Using dataset stats: {pretrained_norm_stats}")
                 if PartialState().is_main_process:
                     work_dir = misc.get_work_dir()
-                    save_dataset_stats_to_json(dataset_stats, os.path.join(work_dir, "dataset_stats.json"))
+                    save_dataset_stats_to_json(dataset_stats, os.path.join(work_dir, stats_filename))
 
             processor.set_normalizer_from_stats(dataset_stats)
             self.lerobot_dataset.set_processor(processor)

@@ -80,6 +80,12 @@ train:
               size: [224, 224]
         text_embedding_cache_dir: ./data/text_embeds_cache/libero
         context_len: 128
+        # Distinct per-embodiment filename: RobotVideoDataset otherwise saves its
+        # computed/loaded stats to a hardcoded "dataset_stats.json" in the shared
+        # work_dir, and RoboTwin's dataset (constructed after LIBERO's) would silently
+        # overwrite LIBERO's freshly-computed stats before they're ever durably saved
+        # (see research/NOTES.md "Dataset-stats collision").
+        stats_filename: libero_dataset_stats.json
 
     - name: robotwin
       ratio: 1.0
@@ -142,5 +148,6 @@ train:
               size: [240, 320]
         text_embedding_cache_dir: ./data/text_embeds_cache/robotwin
         context_len: 128
+        stats_filename: robotwin_dataset_stats.json
 
 val: null
