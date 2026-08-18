@@ -122,7 +122,31 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+8 steps, sane and notably low, stable losses (`0.1002, 0.1844, 0.1990, 0.1920,
+0.3049, 0.1400, 0.1840, 0.1189`) — much lower than any mixed-embodiment candidate's
+smoke test, expected since this is pure LIBERO data the model already handles well.
+Confirmed via `Setting DiT to train mode...` that the full-trainable-backbone mode
+is active. Checkpoint verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero
+NaN/Inf. Smoke-test run directory deleted after verification; log at
+`checkpoints/exp0009_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=libero_only_disjoint_offset_control_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0009_libero_only_control_v1 \
+    save_every=200 \
+    wandb.name=exp0009_libero_only_control
+  ```
+- start time: 2026-08-18 ~15:30 UTC (immediately following the smoke test)
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0009_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0009.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log
 
 ## 7. Evaluation events
 
