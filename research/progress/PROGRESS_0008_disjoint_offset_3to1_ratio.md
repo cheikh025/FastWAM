@@ -120,7 +120,31 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+8 steps, sane losses (`0.9352, 0.5128, 0.5894, 1.0796, 1.3958, 0.6361, 1.0164,
+0.4416`), no NaN/Inf. Confirmed via `Setting DiT to train mode...` (matches
+exp0001/exp0003's full-trainable-backbone log message, not the frozen-backbone
+family's `Freezing shared MoT backbone` message) that the correct trainable-module
+mode is active. Checkpoint verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`,
+zero NaN/Inf. Smoke-test run directory deleted after verification; log at
+`checkpoints/exp0008_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_3to1_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0008_3to1_ratio_v1 \
+    save_every=200 \
+    wandb.name=exp0008_disjoint_offset_3to1_ratio
+  ```
+- start time: 2026-08-18 ~14:02 UTC (immediately following the smoke test)
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0008_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0008.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log
 
 ## 7. Evaluation events
 
