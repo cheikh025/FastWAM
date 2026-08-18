@@ -276,3 +276,96 @@ stopped cleanly; all 4 GPUs confirmed at 0MiB/0% after training exited.
   ceiling around 63% on this task family, not merely noise. The RoboTwin evidence
   (below) is the more decisive test of this candidate's actual purpose (more budget
   -> more RoboTwin capability).
+
+### Evaluation event — RoboTwin `progress_check` (final, step 4000)
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0006, step 4000
+- decision this evaluation was meant to inform: does 4x more training on exp0004's exact recipe improve RoboTwin capability, per this candidate's core hypothesis?
+- exact task/difficulty coverage: same 2-task panel as exp0001/exp0004/exp0005 (`adjust_bottle`, `click_alarmclock`), `demo_clean` and `demo_randomized`
+- trials/episodes: 3 per task per phase
+- exact command (per-task, pinned to separate GPUs):
+  ```bash
+  CUDA_VISIBLE_DEVICES=<0|1> python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/checkpoints/weights/step_004000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/robotwin_dataset_stats.json \
+    EVALUATION.task_name=<adjust_bottle|click_alarmclock> EVALUATION.eval_num_episodes=3 \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+- **result**:
+
+  | Task | Clean | Randomized | exp0004 Clean | exp0004 Randomized |
+  |---|---:|---:|---:|---:|
+  | `adjust_bottle` | 0.0% | 0.0% | 0.0% | 0.0% |
+  | `click_alarmclock` | **0.0%** | **0.0%** | 33.3% | 33.3% |
+
+**Complete regression, confirmed via raw `_result_*.txt` files directly (not just
+log parsing).** `click_alarmclock` — the one real RoboTwin capability found
+anywhere in this project — is entirely gone at step 4000, on both clean and
+randomized phases, on the exact same recipe (frozen backbone, disjoint-offset
+projections) that produced it at step 1000. `adjust_bottle` remains dead
+throughout. 4x more training did not improve RoboTwin capability; it destroyed the
+only capability that existed.
+- raw results path: `evaluate_results/robotwin/reweighted_multiembodiment_exp0006_disjoint_offset_frozen_backbone_4k_v1/20260818_114019/{adjust_bottle,click_alarmclock}/_result_{clean,random}.txt`
+- runtime: ~19 minutes total
+- validity checks: correct checkpoint path in every launch command; `unseen` instruction type; both phases completed for both tasks (`manager finished successfully` for each); `EVALUATION.dataset_stats_path` passed explicitly.
+- decision enabled by this evidence: **`DIAGNOSE`** — this result, combined with LIBERO's flat 63.33% across three different training treatments (exp0004/exp0005/exp0006), needs its own investigation before choosing exp0007. See Section 9.
+
+## 8. Decision
+
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (progress-check grade only)
+- **All five LIBERO >=90% canonical:** no (63.33% Spatial sentinel, below floor, unchanged from exp0004/exp0005)
+- **Reason:** LIBERO retention did not improve with 4x more training (flat at 63.33%, matching exp0004 and exp0005 exactly), and RoboTwin capability got *strictly worse* — `click_alarmclock`'s only real success (33.3%/33.3%) vanished entirely, while `adjust_bottle` never gained anything. The candidate's core hypothesis (more training budget unlocks more RoboTwin capability through the same 6 trainable tensors) is directly refuted by this evidence — more budget instead destroyed the one capability that existed.
+- **Checkpoint/branch to preserve:** none; not promoted. Checkpoint removed after evidence capture.
+- **Next main-line parent:** unchanged — exp0019. **exp0004's step-1000 checkpoint remains the single best evidence point found so far** (63.33% LIBERO, genuine partial RoboTwin capability) — but it was not preserved (deleted per the project's rejected-checkpoint cleanup convention), so it is not directly recoverable; its exact recipe is fully reproducible from `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` + `configs/task/multiembodiment_libero_robotwin_disjoint_offset_frozen_backbone_3e-5.yaml` + `max_steps=1000` if ever needed again.
+
+## 9. What this changes for the next experiment
+
+Three candidates (exp0004, exp0005, exp0006) now share the same LIBERO ceiling
+(63.33%, 19/30) despite three different training treatments (1000 steps unmodified;
+1000 steps with a partial-plasticity backbone; 4000 steps with the same frozen
+backbone) — this is unlikely to be coincidence at this point and looks like a real,
+recipe-level ceiling: the 6 trainable projection tensors, however trained, converge
+to roughly the same LIBERO-Spatial aggregate given "enough" gradient exposure (even
+just 1000 steps appears to already be "enough" — exp0006's 4x more steps changed
+nothing on the LIBERO side, for better or worse).
+
+On RoboTwin, the picture is more concerning: **both exp0005 (different LR) and
+exp0006 (same recipe, more steps) actively destroyed exp0004's one real capability
+rather than building on it.** This is a strong signal that exp0004's step-1000
+checkpoint sits at (or very near) a narrow, fragile optimum for `click_alarmclock`
+specifically — not a stable capability that further training reinforces, but an
+accident of where gradient descent happened to be after ~500 realized RoboTwin
+gradient steps, which any further optimization (whether via a different LR or more
+steps at the same LR) disturbs rather than improves. If true, this means the
+"just add more training" and "just tune the LR" directions are both dead ends *for
+this specific recipe* (frozen backbone, 6-tensor trainable budget, ~1:1
+LIBERO:RoboTwin interleaving) — the model isn't accumulating a growing, robust
+RoboTwin skill across training, it's landing on lucky/unlucky checkpoints along a
+noisy trajectory.
+
+This points toward needing a genuinely different mechanism for exp0007, not another
+point on the (budget x LR) grid already explored:
+
+1. **More frequent intermediate checkpointing + selection, not just more training**: if the underlying trajectory is noisy rather than monotonically improving, the right lever might be evaluating many more intermediate checkpoints (e.g. every 100-200 steps) and *selecting* the best one by RoboTwin progress-check score, rather than training longer and evaluating only the end result. This treats checkpoint selection as compensating for training noise instead of assuming later = better.
+2. **Increase the trainable parameter budget beyond just 6 tensors** (still short of a full unfreeze): e.g. also unfreeze the last few MoT/DiT layers (not the whole 30-layer backbone) — enough added capacity that RoboTwin's ~500 gradient steps can build a more genuinely robust representation rather than overfitting/perturbing a narrow existing solution, while still limiting LIBERO-relevant drift to a small fraction of the backbone.
+3. **Rehearsal/replay weighting**: increase the LIBERO:RoboTwin interleaving ratio in RoboTwin's favor within a similar total-step budget (RoboTwin's own components currently see relatively few of their "own" gradient steps at ~1:1) — untested variable so far; all six candidates used the same ~1:1 ratio.
+4. **Revisit whether `click_alarmclock`'s exp0004 result was ever a stable capability at all** — a direct, cheap diagnostic before spending more training compute: evaluate exp0004's exact recipe (re-trained fresh, 1000 steps, since the original checkpoint was deleted) with a different eval seed, or a slightly larger episode count, to see whether 33.3%/33.3% replicates. If it doesn't reliably replicate even under identical training, the entire "click_alarmclock capability" narrative built across exp0004-0006 may itself be resting on a single lucky evaluation seed rather than a real, reproducible skill.
+
+Recommend `$investigate-fastwam-problem` to weigh option 4 (the cheapest, most
+foundational check — does the capability even reliably exist?) before committing
+compute to options 1-3, since if the answer to 4 is "no, it doesn't replicate," the
+entire recent evidence chain needs reinterpreting as noise rather than a real
+capability that later candidates destroyed.
+
+## 10. Artifacts
+
+- training log: `checkpoints/exp0006_train.log`
+- smoke test log: `checkpoints/exp0006_smoke_train.log`
+- mid-run LIBERO logs: `checkpoints/exp0006_libero_screen_step1000.log` (crashed, pruner race), `checkpoints/exp0006_libero_screen_step1500_midrun.log` (succeeded, 80%)
+- final LIBERO screen log: `checkpoints/exp0006_libero_screen_final.log`
+- final LIBERO screen raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_112827/`
+- RoboTwin progress-check logs: `checkpoints/exp0006_robotwin_adjust_bottle.log`, `checkpoints/exp0006_robotwin_click_alarmclock.log`
+- RoboTwin progress-check raw results: `evaluate_results/robotwin/reweighted_multiembodiment_exp0006_disjoint_offset_frozen_backbone_4k_v1/20260818_114019/`
+- expanded parent checkpoint used: `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt`
