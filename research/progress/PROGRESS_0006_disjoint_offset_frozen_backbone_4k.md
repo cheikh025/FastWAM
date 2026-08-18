@@ -184,6 +184,34 @@ is still concurrently active) rather than waiting for training to finish. Traini
 confirmed still healthy immediately after the eval job started (step 1400, same
 speed/loss pattern, no slowdown or memory pressure observed).
 
+**First mid-run eval attempt crashed** (real infra bug, not a model/data problem):
+the checkpoint pruner deleted `step_001000.pt` once `step_001500.pt` was saved
+(~19 min later, matching the `save_every=500` cadence at `0.44 step/s`), while the
+LIBERO screen (2 of 10 tasks already completed) was still reading it — task 2/10
+crashed with a checkpoint-load failure, aborting the whole scheduler on first
+failure. Documented in `research/NOTES.md` "Mid-training eval gotcha". **Recovery**:
+relaunched a smaller, faster mid-run panel (`EVALUATION.num_trials=1` instead of
+`3`, `MULTIRUN.max_tasks_per_gpu=2`) against the new current checkpoint
+(`step_001500.pt`) — a full 3-trial/10-task screen reliably takes ~33-40 minutes
+regardless of parallelism (confirmed across exp0003-0005), longer than the
+~19-minute save-cadence window, so a full screen cannot safely run concurrently
+with this training run's pruner; a 1-trial (10-episode) panel is fast enough to
+finish inside one window and is adequate for a training-control decision, though
+noisier than the full screen used for final candidate evaluation.
+
 ## 7. Evaluation events
 
-None yet.
+### Event — LIBERO-Spatial mid-run diagnostic (step ~1500/4000)
+
+- benchmark: `libero`
+- purpose: `diagnostic` (mid-run, not `candidate_screen` — reduced to 1 trial/task for pruner-race-safety, see above)
+- checkpoint / training step: exp0006, step 1500 (partial budget, training still active)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/checkpoints/weights/step_001500.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=1 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- result: launched, awaiting completion
