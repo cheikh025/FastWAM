@@ -126,7 +126,10 @@ Checkpoints are genuinely ~12GB each. With `save_every=200` over `max_steps=4000
 - log: `checkpoints/exp0013_train.log`
 - pruner log: `checkpoints/exp0013_pruner.log`
 - First launch attempt failed immediately with `accelerate: command not found` -- used the base image's `/venv/main` instead of this project's dedicated venv (`/workspace/venvs/fastwam`, per `research/RUNBOOK.md`'s Environment section: FastWAM's venv is fully separate from `/venv/main`, which carries an incompatible torch 2.11). Fixed and relaunched with `source /workspace/venvs/fastwam/bin/activate`; no research-design impact.
-- budget: `max_steps=4000`, `batch_size=2`, `gradient_accumulation_steps=4` (effective global batch 32), `save_every=200`, `save_full_state=false`, LR `3e-5` cosine, resuming from the zero-init-fixed expanded release checkpoint.
+- budget: `max_steps=4000` ceiling, `batch_size=2`, `gradient_accumulation_steps=4` (effective global batch 32), `save_every=200`, `save_full_state=false`, LR `3e-5` cosine, resuming from the zero-init-fixed expanded release checkpoint.
+- dataset size: `Train/val dataset size: 6289288/6289288` (combined LIBERO+RoboTwin, 1:1 `InterleavedEmbodimentSampler`).
+- VRAM: ~68.7-72.8GB/80GB per GPU across all 4 GPUs at `batch_size=2` (84-89% utilized, comfortable headroom, no OOM risk).
+- **Plan revision (user feedback, before step 200)**: `max_steps=4000` was never a hard commitment, just an initial suggested budget (user clarified: "no i did not say 4k is ceiling u can try any number i just suggest"). Rather than running unconditionally, treat step ~1000-2000 as a progress-check-then-decide point (LIBERO sentinel + RoboTwin Clean-only cheap panel); the actual training length may end up shorter or longer than 4000 depending on that evidence (`CONTINUE_TRAINING`/`EXTEND_TRAINING`/`STOP_TRAINING`/`SELECT_CHECKPOINT`). Default for *future* candidates should start smaller (1000-2000 steps) and scale up based on evidence rather than committing a large budget upfront -- saved as standing feedback memory. Given the `KEEP=1` pruner overwrites checkpoints every `save_every=200` cadence, the checkpoint nearest the intended eval point must be evaluated (or copied out) promptly before the next save overwrites it locally.
 
 ## 7. Evaluation events
 
