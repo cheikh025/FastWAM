@@ -21,9 +21,15 @@ trainable/frozen x projections overlap/disjoint) matrix and reveals two clean,
 (73.33%->16.67%) but helps when projections are disjoint (50.00%->63.33%) — evidence
 that disjoint offsets are a real, substantial fix, and that backbone-level drift is a
 *second, independent* interference channel. Still below exp0001 and far below the
-90% floor. **Decision: `REJECT`** (floor not met) but this is the strongest
-multi-embodiment evidence base so far for designing exp0005. See Section 7 for the
-full matrix analysis and Section 9 for next-candidate reasoning.
+90% floor. A RoboTwin progress check on the same checkpoint (2 tasks, clean+randomized,
+3 episodes each) found `click_alarmclock` at **33.3%/33.3%** — the first non-zero
+RoboTwin result anywhere in this project (exp0001 measured 0.0% everywhere, including
+this exact task); `adjust_bottle` remained at 0.0%/0.0%. **Decision: `REJECT`**
+(LIBERO floor not met) but this is the strongest multi-embodiment evidence base so
+far for designing exp0005 — both because it isolates the disjoint-offset effect
+cleanly and because it is the first candidate to show genuine (if partial) RoboTwin
+learning. See Section 7 for the full matrix analysis and Section 9 for next-candidate
+reasoning.
 
 ## 2. Research state before experiment
 
@@ -263,4 +269,95 @@ candidate exceeds exp0001's 73.33%, and none clear the 90% floor.
   `FileNotFoundError` — a real, previously-masked infra gap, see
   `research/NOTES.md` "RoboTwin eval gotcha — dataset_stats.json auto-discovery".)
 - reference: exp0001's same 2-task panel — 0.0% across every measurement
-- result: launched, awaiting completion
+- **result**:
+
+  | Task | Clean | Randomized |
+  |---|---:|---:|
+  | `adjust_bottle` | 0.0% (0/3) | 0.0% (0/3) |
+  | `click_alarmclock` | **33.3% (1/3)** | **33.3% (1/3)** |
+
+  **`click_alarmclock` is the first non-zero RoboTwin result anywhere in this
+  project.** exp0001 (trainable backbone, overlapping projections) measured 0.0%
+  across every prior RoboTwin measurement, including this exact same task/panel.
+  This is genuine evidence that the frozen-backbone + disjoint-offset recipe (which
+  also gave the best LIBERO retention among the three imperfect candidates,
+  63.33%) can produce *some* real RoboTwin capability — not just avoid catastrophic
+  forgetting. `adjust_bottle` still shows zero capability, consistent with
+  exp0001's own diagnostic note that ~500 real per-embodiment gradient steps (given
+  ~1:1 interleaving over 1000 total steps) is a small fraction of what a dedicated
+  RoboTwin specialist would use, and some tasks may need more exposure/harder skills
+  than others before any success emerges at all.
+- raw results path: `evaluate_results/robotwin/reweighted_multiembodiment_exp0004_disjoint_offset_frozen_backbone_v1/20260818_064304/{adjust_bottle,click_alarmclock}/_result_{clean,random}.txt`
+- runtime: ~23 minutes total (both tasks in parallel, clean+random phases sequential per task)
+- infra anomaly: first attempt (both tasks) crashed with `FileNotFoundError` on
+  `dataset_stats.json` auto-discovery (see command note above) — not a model/data
+  problem, fixed by passing `EVALUATION.dataset_stats_path` explicitly; the
+  crashed attempt's empty-result `summary.json` (`evaluate_results/.../20260818_064228/`)
+  is retained as a record of the failed attempt, not the actual evidence.
+- validity checks: correct checkpoint path in every launch command; `unseen`
+  instruction type confirmed in all 4 raw result files; both clean and randomized
+  phases completed for both tasks (`manager finished successfully` for each).
+- decision enabled by this evidence: informs exp0005's design — the frozen-backbone
+  disjoint-offset recipe is not just a retention-preserving no-op, it has already
+  begun learning at least one real RoboTwin skill within the same 1000-step budget
+  that gave exp0001 zero measurable RoboTwin capability at any task. Combined with
+  the LIBERO matrix, this makes "give RoboTwin's projection/action-head more
+  capacity to keep learning while limiting how much backbone drift LIBERO retention
+  has to absorb" (i.e. partial/gradual backbone plasticity, not a full freeze or
+  full train) a well-motivated next step rather than a purely theoretical one.
+- reason: progress-check-grade evidence (2 of 50 tasks, 3 trials/phase) — sufficient
+  to establish "some RoboTwin capability now exists" but not to characterize
+  RoboTwin performance broadly; not canonical, not promotion-relevant on its own.
+
+## 8. Decision
+
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (progress-check grade only, 2 of 50 tasks)
+- **All five LIBERO >=90% canonical:** no (63.33% Spatial sentinel, below floor)
+- **Reason:** LIBERO retention floor not met, though this is the best frozen-backbone retention result (63.33%, vs exp0002's 16.67%) and the first candidate with any measured non-zero RoboTwin capability (`click_alarmclock` 33.3%/33.3%).
+- **Checkpoint/branch to preserve:** none; not promoted. Checkpoint removed after evidence capture (reproducible from `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` + this task config).
+- **Next main-line parent:** unchanged — exp0019.
+
+## 9. What this changes for the next experiment
+
+The completed 2x2 matrix plus this RoboTwin evidence together motivate a specific,
+well-targeted next design rather than another single-axis toggle:
+
+|  | overlapping projections | disjoint projections |
+|---|---:|---:|
+| trainable backbone | exp0001: 73.33% LIBERO, 0% RoboTwin | exp0003: 50.00% LIBERO, not tested |
+| frozen backbone | exp0002: 16.67% LIBERO, not tested | exp0004: 63.33% LIBERO, **33.3%/33.3% on 1 of 2 RoboTwin tasks** |
+
+exp0004 shows a full backbone freeze is not a dead end for RoboTwin skill
+acquisition — it already learned something in the same 1000-step budget that gave
+exp0001 zero capability everywhere — but it likely caps how much RoboTwin can
+ultimately learn (a frozen backbone limits how well the shared visual/temporal
+representations can adapt to RoboTwin's very different bimanual visual domain,
+which the trainable-backbone exp0001, despite its worse retention, presumably
+handles better — though this remains unconfirmed since exp0001 was never evaluated
+long enough or with a working projection design to show RoboTwin gains).
+
+**Recommended exp0005 direction**: combine disjoint-offset projections with *partial*
+backbone plasticity instead of a full freeze or full train — aiming to keep most of
+exp0004's retention advantage while giving the backbone enough room to better adapt
+to RoboTwin (potentially recovering `adjust_bottle` and improving `click_alarmclock`
+further). Concrete options, roughly in order of implementation simplicity:
+
+1. **Much lower backbone LR than the projection-layer LR** (e.g. backbone at
+   `3e-6` or `1e-6`, projections at the existing `3e-5`) — simplest to implement
+   (two parameter groups in the optimizer instead of a binary freeze), directly
+   dials the amount of backbone drift rather than an all-or-nothing choice.
+2. **Partial layer freezing** (e.g. freeze the video-expert DiT blocks entirely,
+   leave the action-expert DiT blocks and MoT mixture attention trainable) — more
+   surgical, targets the hypothesis that video-domain drift specifically (RoboTwin's
+   very different visual scenes) is what hurts LIBERO, while action-relevant
+   backbone capacity remains free to adapt.
+3. **Gradual/staged unfreezing** (start frozen like exp0004, unfreeze progressively
+   over the step budget) — most implementation complexity, likely not worth it
+   before options 1-2 are tried.
+
+Option 1 (differential LR) is recommended as the next candidate: it is a single,
+easily-verified trainer change (two optimizer parameter groups), directly
+interpolates between exp0003 (LR ratio 1:1, full plasticity) and exp0004 (LR ratio
+0:1, no plasticity), and its LR ratio can be tuned by a future candidate if the
+first choice isn't well-calibrated.
