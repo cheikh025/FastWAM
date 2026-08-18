@@ -146,6 +146,26 @@ zero NaN/Inf. Smoke-test run directory deleted after verification; log at
 - disk safety: background pruner (`checkpoints/prune_checkpoints_exp0008.log`), `KEEP=1`, 15s polling, 45GB free at launch
 - monitoring: persistent `Monitor` on the training log
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies. Final: `loss=0.1734
+loss_action=0.0726 loss_video=0.1008` — notably much lower than exp0001/exp0003's
+typical final losses (~0.6-1.5 range), consistent with the 3:1 ratio meaning ~750 of
+1000 batches are LIBERO (which the model already handles well from exp0019's
+inherited weights) — not directly comparable to prior candidates' loss values given
+the different batch-mix composition, but a reasonable, expected pattern (not a sign
+of a problem). Checkpoint `step_001000.pt` verified: shapes
+`(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf, `step: 1000`. Training log:
+`checkpoints/exp0008_train.log`. Runtime ~49 minutes (14:06 -> 14:55), comparable to
+exp0001/exp0003's trainable-backbone pace.
+
+### Evaluation launch
+
+LIBERO-Spatial screen launched on GPUs 0-1. RoboTwin progress check will be run
+*sequentially* after this finishes (not in parallel via non-zero
+`CUDA_VISIBLE_DEVICES`, per the documented gotcha in `research/NOTES.md` that
+`run_robotwin_manager.py` ignores that remapping).
+
 ## 7. Evaluation events
 
 None yet.
