@@ -1,40 +1,20 @@
 # Research Goal: FastWAM Multi-Embodiment LIBERO + RoboTwin
 
-## Inherited parent model
+## Parent model
 
-Start from the previously promoted LIBERO checkpoint:
+Start from the **official FastWAM LIBERO release checkpoint**:
 
-`runs/reweighted_libero90_finetune/exp0019_spatial_weak_task_oversample/checkpoints/weights/step_005000.pt`
+`checkpoints/fastwam_release/libero_uncond_2cam224.pt` (from `https://huggingface.co/yuanty/fastwam`; paired stats `checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json`)
 
-Recorded durable location:
+This project previously started from a research checkpoint (`exp0019`, from the `autoresearch/libero90-v1` lineage) but switched parents after finding `exp0019` was unusually sensitive to the checkpoint-expansion process specifically on LIBERO-Spatial — see `research/progress/PROGRESS_0011*.md` for the full investigation. The release checkpoint expands cleanly and reproducibly and is now the parent. `autoresearch/libero90-v1` remains read-only history, no longer the checkpoint source. All work happens on `autoresearch/robotwin-multiembodiment-v1`.
 
-`cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt`
+## Parent LIBERO evidence
 
-Checkpoint-producing code state to verify:
-
-- fork: `https://github.com/cheikh025/FastWAM`
-- parent lineage branch: `autoresearch/libero90-v1`
-- exact commit: `b2b49d0`
-
-The parent branch is read-only for this project. Create and work on `autoresearch/robotwin-multiembodiment-v1` from the exact verified parent code state.
-
-## Inherited canonical LIBERO evidence
-
-The parent checkpoint was previously validated canonically at 50 trials/task across all 130 LIBERO tasks:
-
-| Suite | Parent success |
-|---|---:|
-| LIBERO-Spatial | 97.00% |
-| LIBERO-Object | 99.60% |
-| LIBERO-Goal | 97.20% |
-| LIBERO-Long / LIBERO-10 | 98.00% |
-| LIBERO-90 | 95.13% |
-
-These values are reference facts inherited from the parent project. They are not new-run measurements and do not populate the new experiment ledger as if this project produced them.
+Verified fresh on this machine so far (LIBERO-Spatial only, expanded K=21 checkpoint, n=10, three independent runs across two seeds): 96.00% / 97.00% / 97.00%. Native (unexpanded) Spatial and all of Object/Goal/Long are not yet measured for the release checkpoint — establish this baseline before the first real training candidate. Do not reuse `exp0019`'s old inherited numbers (Spatial 97.00%, Object 99.60%, Goal 97.20%, Long 98.00%, LIBERO-90 95.13%) as if they applied to the release checkpoint; they were specific to a different, now-abandoned parent.
 
 ## Objective
 
-Adapt the same FastWAM research line for **RoboTwin multi-embodiment learning** while preserving LIBERO capability.
+Adapt the release-checkpoint FastWAM model for **RoboTwin multi-embodiment learning**, targeting **>=90% average RoboTwin success on the full 50-task Aloha-AgileX benchmark** (Clean and Randomized splits evaluated separately, both >=90%), while preserving LIBERO capability.
 
 Hard promotion constraints:
 
@@ -42,9 +22,10 @@ Hard promotion constraints:
 - `LIBERO-Object success >= 90%`
 - `LIBERO-Goal success >= 90%`
 - `LIBERO-Long / LIBERO-10 success >= 90%`
-- `LIBERO-90 success >= 90%`
 
-Among checkpoints satisfying all five constraints, optimize the canonical RoboTwin performance defined and verified during setup.
+**LIBERO-90 is out of scope** — do not optimize for it or spend evaluation budget on it unless directly relevant to a specific decision.
+
+Among checkpoints satisfying all four constraints, optimize the canonical RoboTwin performance defined and verified during setup.
 
 Do not collapse RoboTwin and LIBERO into one average that can hide catastrophic forgetting.
 
@@ -58,7 +39,7 @@ Use this as the initial shared action interface while the research loop explores
 
 ## Ranking checkpoints
 
-A checkpoint is eligible for the main line only after canonical evidence shows all five LIBERO measurements are >=90%.
+A checkpoint is eligible for the main line only after canonical evidence shows all four LIBERO measurements (Spatial, Object, Goal, Long) are >=90%.
 
 Among eligible checkpoints:
 
