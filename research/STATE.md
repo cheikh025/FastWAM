@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0005 rejected (partial backbone plasticity made RoboTwin worse, not better), investigating before exp0006`
+Status: `RESEARCH_LOOP_ACTIVE — exp0006 training (exp0004's recipe, 4000 steps, mid-run check planned at step 2000)`
 
 ## Inherited parent reference
 
