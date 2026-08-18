@@ -178,7 +178,20 @@ def _normalize_proprio(
     state_batch = {"state": {state_key: torch.as_tensor(proprio, dtype=torch.float32).unsqueeze(0)}}
     state_batch = processor.action_state_transform(state_batch)
     state_batch = processor.normalizer.forward(state_batch)
-    return state_batch["state"][state_key]
+    state = state_batch["state"][state_key]
+
+    # Shared padded multi-embodiment interface: pad the natural-dim state up to the
+    # merger's `state_target_dim` (K) with zeros, matching training's
+    # `action_state_merger.forward()` (see fastwam.utils.losses / research/RUNBOOK.md
+    # "Shared padded action representation"). No-op when no padding is configured
+    # (state_target_dim is None or already equals the natural dim).
+    merger = getattr(processor, "action_state_merger", None)
+    target_dim = getattr(merger, "state_target_dim", None) if merger is not None else None
+    if target_dim is not None and state.shape[-1] < target_dim:
+        pad_dim = target_dim - state.shape[-1]
+        state = torch.nn.functional.pad(state, (0, pad_dim))
+
+    return state
 
 
 def _obs_to_model_input(
@@ -269,8 +282,18 @@ def _denormalize_action(action: torch.Tensor, processor: FastWAMProcessor) -> np
         )
 
     action_key = action_meta[0]["key"]
-    normalizer = processor.normalizer.normalizers["action"][action_key]
+    natural_dim = int(action_meta[0]["shape"])
     action = action.to(dtype=torch.float32, device="cpu")
+
+    # Shared padded multi-embodiment interface: crop the model's K-wide output back
+    # to this embodiment's natural action dim BEFORE denormalizing, mirroring
+    # training's `action_state_merger.backward()` (crop happens before un-normalize
+    # in `FastWAMProcessor.postprocess()`). No-op when no padding was used (the model
+    # output is already at the natural dim).
+    if action.shape[-1] > natural_dim:
+        action = action[..., :natural_dim]
+
+    normalizer = processor.normalizer.normalizers["action"][action_key]
     denorm = normalizer.backward(action)
     return denorm.numpy()
 
@@ -374,7 +397,14 @@ def _predict_action_chunk(
     else:
         num_inference_steps = int(num_inference_steps_cfg)
     prompt_template = DEFAULT_PROMPT
-    prompt = prompt_template.format(task=task_description)
+    instruction = task_description
+    # Qwen-VLA-style embodiment conditioning (see FastWAMProcessor.augment_instruction):
+    # match training's prepended embodiment description, when this processor was
+    # configured with one. No-op for existing single-embodiment eval configs.
+    embodiment_description = getattr(processor, "embodiment_description", None)
+    if embodiment_description:
+        instruction = f"{embodiment_description} {instruction}"
+    prompt = prompt_template.format(task=instruction)
 
     image, proprio, imgs = _obs_to_model_input(
         obs,

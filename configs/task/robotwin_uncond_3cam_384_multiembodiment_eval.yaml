@@ -1,0 +1,30 @@
+# @package _global_
+#
+# Evaluation-only task config for scoring an exp0001-family (shared padded K=14
+# multi-embodiment) checkpoint on RoboTwin. Uses the K=14-padded (no-op for RoboTwin,
+# already natural K=14), embodiment-conditioned RoboTwin data/processor config as
+# training (configs/data/robotwin_multiembodiment.yaml) and the matching model config
+# (configs/model/fastwam_multiembodiment.yaml).
+#
+# Not a training config (batch_size/scheduler fields below are placeholders required
+# by shared Hydra schema, unused by experiments/robotwin/run_robotwin_manager.py).
+
+defaults:
+  - override /data: robotwin_multiembodiment
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+
+lr_scheduler_type: "cosine"
+learning_rate: 1e-4
+num_epochs: 1
+max_steps: null
+log_every: 10
+save_every: 999999
+eval_every: 999999
+
+gradient_accumulation_steps: 1
+weight_decay: 1e-2
+resume: null

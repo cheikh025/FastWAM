@@ -201,7 +201,17 @@ class WorldActionRobotWinPolicy:
         state_batch = {"state": {state_key: torch.as_tensor(state, dtype=torch.float32).unsqueeze(0)}}
         state_batch = self.processor.action_state_transform(state_batch)
         state_batch = self.processor.normalizer.forward(state_batch)
-        return state_batch["state"][state_key]
+        result = state_batch["state"][state_key]
+
+        # Shared padded multi-embodiment interface (no-op for RoboTwin today, since
+        # its natural state dim already equals K=14 — kept for consistency/defense in
+        # depth, see the identical fix in experiments/libero/eval_libero_single.py).
+        merger = getattr(self.processor, "action_state_merger", None)
+        target_dim = getattr(merger, "state_target_dim", None) if merger is not None else None
+        if target_dim is not None and result.shape[-1] < target_dim:
+            result = torch.nn.functional.pad(result, (0, target_dim - result.shape[-1]))
+
+        return result
 
     def _denormalize_action(self, action: torch.Tensor) -> np.ndarray:
         if action.ndim == 2:
@@ -214,8 +224,17 @@ class WorldActionRobotWinPolicy:
             raise ValueError("Expected exactly one merged action key in shape_meta['action'].")
 
         action_key = action_meta[0]["key"]
+        natural_dim = int(action_meta[0]["shape"])
+        action = action.to(dtype=torch.float32, device="cpu")
+
+        # Shared padded multi-embodiment interface (no-op for RoboTwin today, since
+        # its natural action dim already equals K=14 — see the identical fix in
+        # experiments/libero/eval_libero_single.py).
+        if action.shape[-1] > natural_dim:
+            action = action[..., :natural_dim]
+
         normalizer = self.processor.normalizer.normalizers["action"][action_key]
-        denorm = normalizer.backward(action.to(dtype=torch.float32, device="cpu"))
+        denorm = normalizer.backward(action)
         return denorm.numpy()
 
     def _build_robotwin_image_tensor(self, observation: Dict[str, Any]) -> torch.Tensor:
@@ -238,7 +257,14 @@ class WorldActionRobotWinPolicy:
         state_vector = np.asarray(observation["joint_action"]["vector"], dtype=np.float32)
         proprio = self._normalize_state(state_vector)
 
-        prompt = DEFAULT_PROMPT.format(task=instruction)
+        # Qwen-VLA-style embodiment conditioning (see FastWAMProcessor.augment_instruction):
+        # match training's prepended embodiment description, when this processor was
+        # configured with one. No-op for existing single-embodiment eval configs.
+        conditioned_instruction = instruction
+        embodiment_description = getattr(self.processor, "embodiment_description", None)
+        if embodiment_description:
+            conditioned_instruction = f"{embodiment_description} {conditioned_instruction}"
+        prompt = DEFAULT_PROMPT.format(task=conditioned_instruction)
         infer_kwargs = {
             "prompt": prompt,
             "input_image": image_tensor,
