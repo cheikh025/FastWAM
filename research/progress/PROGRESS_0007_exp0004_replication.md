@@ -163,6 +163,19 @@ progress check launched in parallel on GPUs 2-3 (`CUDA_VISIBLE_DEVICES=2` for
 — all 4 GPUs used concurrently since the two evaluators don't overlap on GPU
 indices, saving wall-clock time versus running them sequentially.
 
+**Both RoboTwin jobs immediately crashed with CUDA OOM** — a real, previously-
+undiscovered infra gotcha: `run_robotwin_manager.py`/`eval_robotwin_single.py`
+appears to ignore `CUDA_VISIBLE_DEVICES` remapping (both jobs' Hydra overrides
+showed `gpu_id=0`, and the OOM traceback's process list confirms they actually
+allocated on **physical GPU 0**, already loaded with LIBERO's own workers, not
+physical GPU 2/3 as intended). Every prior successful RoboTwin launch in this
+project used `CUDA_VISIBLE_DEVICES=0`/`=1` (a no-op remap), so this was never
+actually tested before. Documented in `research/NOTES.md`. **Recovery**: wait for
+the LIBERO screen (unaffected, still running normally on GPUs 0-1) to finish, then
+launch the RoboTwin progress check sequentially afterward using the proven
+`CUDA_VISIBLE_DEVICES=0`/`=1` pattern instead of attempting further GPU-parallel
+tricks.
+
 ## 7. Evaluation events
 
 None yet.
