@@ -22,16 +22,19 @@ The project originally inherited `exp0019` (a heavily/narrowly fine-tuned resear
 - LIBERO retention: **LIBERO-Spatial, Object, Goal, Long/LIBERO-10 all >=90%.**
 - **LIBERO-90 is explicitly out of scope** — do not optimize for it or spend budget evaluating it unless directly relevant to a specific decision.
 
-## Release-checkpoint LIBERO evidence so far
+## Release-checkpoint LIBERO evidence — baseline established (exp0012)
 
-| Suite | Native (K=7) | Expanded (K=21, zero-init) |
-|---|---:|---:|
-| LIBERO-Spatial | in progress (`exp0012`) | 96.00% / 97.00% / 97.00% (n=10, three runs, two seeds) |
-| LIBERO-Object | in progress (`exp0012`) | not yet measured |
-| LIBERO-Goal | in progress (`exp0012`) | not yet measured |
-| LIBERO-Long | in progress (`exp0012`) | not yet measured |
+| Suite | Expanded (K=21/22, zero-init), n=10 |
+|---|---:|
+| LIBERO-Spatial | 98.00% (also 96.00%/97.00%/97.00% across three earlier independent runs, two seeds — highly consistent) |
+| LIBERO-Object | 99.00% |
+| LIBERO-Goal | 98.00% |
+| LIBERO-Long | 95.00% |
+| **Overall** | **97.50%** |
 
-`exp0012` (launched 2026-08-18, `checkpoints/exp0012_release_native_4suites_n10.log`): native release checkpoint across all four in-scope suites, n=10, in progress.
+Full combined run: `checkpoints/exp0012_release_expanded_4suites_n10.log`, `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_211301/`. Every suite comfortably clears the 90% floor with wide margin — this is the trustworthy pre-training baseline for the multi-embodiment work. Native (K=7, unexpanded) baseline was not completed (superseded by prioritizing the expanded-checkpoint numbers, which are what actually matters going forward); not blocking further work.
+
+RoboTwin baseline check (`click_alarmclock`, small panel, n=3) launched immediately after (`exp0012_robotwin_baseline_click_alarmclock.log`) — first real policy-in-the-loop RoboTwin evaluation of this project's multi-embodiment checkpoint, expected near-0% since the release checkpoint has never seen RoboTwin data (pipeline sanity check + true pre-training reference point).
 
 ## RoboTwin evidence
 
