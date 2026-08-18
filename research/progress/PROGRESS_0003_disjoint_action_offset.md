@@ -5,7 +5,7 @@
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0000_parent_baseline (exp0019); diagnosis inherited from 0001 and 0002
-- **Parent checkpoint:** `cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt` (the **original, unexpanded** checkpoint — not `exp0019_expanded_k14`, see Section 3)
+- **Parent checkpoint:** `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` — re-expanded from `cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt` (hash-verified `decbb99c...` before expansion). Expansion verified: LIBERO's original weights are byte-identical at `[0:7]`/`[0:8]`, RoboTwin's new `[7:21]`/`[8:22]` range is non-zero (encoder) / zero (head), matching the deliberate init rule.
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
 - **Git commit:** `8e74590` (implementation commit; checkpoint expansion + training launch follow)
@@ -205,7 +205,47 @@ Not applicable — setup already validated in `PROGRESS_0000_PARENT_BASELINE.md`
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+Command:
+```bash
+bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_3e-5 \
+  resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+  output_dir=./runs/_smoke_test/multiembodiment_exp0003_v1 \
+  max_steps=8 save_every=8 log_every=1 eval_every=999999
+```
+
+Result: all 8 steps completed with sane, non-NaN losses (`1.2713, 0.8076, 1.2550, 1.7008,
+2.2254, 1.3199, 1.2212, 1.4882`), datasets built correctly (`libero: 277713 samples,
+ratio=1.000`, `robotwin: 6011575 samples, ratio=1.000`), checkpoint written and
+verified: `action_encoder.weight` shape `(1024, 21)`, `head.weight` shape `(21, 1024)`,
+`proprio_encoder.weight` shape `(4096, 22)` (matching the new K=21/22 disjoint-offset
+design), zero NaN/Inf across every tensor. The existing 904GB RoboTwin +81MB LIBERO
+text-embedding caches (built during exp0001 setup) required no recomputation — text
+embeddings depend only on the (unchanged) instruction/embodiment-description strings,
+not the action/proprio dimension. Smoke-test run directory deleted after verification
+(temporary artifact); log at `checkpoints/exp0003_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0003_disjoint_offset_v1 \
+    save_every=200 \
+    wandb.name=exp0003_disjoint_offset_baseline
+  ```
+- start time: 2026-08-18 (immediately following the smoke test)
+- number of GPUs/world size: 4 (`scripts/accelerate_configs/accelerate_zero1_ds.yaml`, DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0003_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0003.log`), `KEEP=1`
+  (only the most recent weights-only checkpoint retained at a time), 15s polling —
+  sized against 34GB free at launch (`(KEEP+1) x ~12GB = 24GB <= 34GB`, per the
+  arithmetic rule from `research/NOTES.md` after the exp0001/exp0002 disk-crisis
+  recurrences)
+- monitoring: persistent `Monitor` on the training log watching for checkpoint-save
+  events, prune events, and failure signatures (Traceback/Error/NaN/OOM/disk-write-failure)
 
 ## 7. Evaluation events
 
