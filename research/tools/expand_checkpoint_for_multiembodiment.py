@@ -11,11 +11,21 @@ Grows:
 preserving the inherited weights EXACTLY at their original index positions.
 
 Initialization of new parameters (deliberate, not incidental):
-  - New encoder INPUT columns (action_encoder, proprio_encoder): drawn from a freshly
-    constructed nn.Linear of the new full input size, seeded -- i.e. exactly what a
-    from-scratch model of the new size would have for those columns. The network needs
-    a real, statistically-appropriate init to learn to read the newly-added channels
-    (e.g. RoboTwin's second-arm channels for LIBERO's widened action_encoder).
+  - New action_encoder INPUT columns: zero-initialized. action_encoder's input is
+    `noisy_action` from the flow-matching process, which is genuinely NON-ZERO at
+    padded columns during both training and inference (noisy_action = (1-t)*noise +
+    t*action, and action=0 at padded columns but noise != 0) -- unlike proprio, the
+    padded action channels are never deterministically zero. A random weight column
+    there would multiply that noise into an untrained, uncontrolled perturbation of
+    the shared hidden representation on every forward pass, corrupting the inherited
+    embodiment's predictions even at zero training steps (see
+    research/progress/PROGRESS_0011_expansion_zero_init_fix.md). Zero-initializing
+    guarantees exactly-zero contribution regardless of the input value, matching the
+    already-correct guarantee for proprio_encoder below, and the network can still
+    learn nonzero weights there via the masked RoboTwin loss once training starts.
+  - New proprio_encoder INPUT columns: zero-initialized for the same reason (safe
+    either way here since proprio's padded input is deterministically 0, but kept
+    consistent rather than special-cased).
   - New head OUTPUT rows: zero-initialized. An unlearned/new output channel starts at a
     well-defined 0 in the flow-matching target space rather than injecting large random
     noise into predictions the model has never been trained to make.
@@ -33,20 +43,28 @@ import torch
 import torch.nn as nn
 
 
-def expand_linear_input(weight: torch.Tensor, bias: torch.Tensor | None, new_in_dim: int, seed: int):
+def expand_linear_input(weight: torch.Tensor, bias: torch.Tensor | None, new_in_dim: int, seed: int, zero_init: bool = True):
     """Grow a Linear's INPUT dimension: weight (out,in)->(out,new_in). Bias is unchanged
-    (bias is per-output-neuron, independent of input width)."""
+    (bias is per-output-neuron, independent of input width).
+
+    zero_init=True (default): new input columns are zero -- guarantees exactly-zero
+    contribution to the output regardless of what value flows through the new input
+    channels (required whenever that input isn't deterministically zero at the padded
+    positions, e.g. action_encoder's noisy_action). zero_init=False: new columns come
+    from a freshly seeded nn.Linear, only safe when the corresponding input is always
+    exactly zero at those columns (e.g. proprio's deterministic padding)."""
     old_out, old_in = weight.shape
     if new_in_dim < old_in:
         raise ValueError(f"new_in_dim ({new_in_dim}) must be >= old_in ({old_in})")
     if new_in_dim == old_in:
         return weight.clone(), (bias.clone() if bias is not None else None)
 
-    torch.manual_seed(seed)
-    fresh = nn.Linear(new_in_dim, old_out)
     new_weight = weight.new_zeros((old_out, new_in_dim))
     new_weight[:, :old_in] = weight
-    new_weight[:, old_in:] = fresh.weight.detach().to(dtype=weight.dtype)[:, old_in:]
+    if not zero_init:
+        torch.manual_seed(seed)
+        fresh = nn.Linear(new_in_dim, old_out)
+        new_weight[:, old_in:] = fresh.weight.detach().to(dtype=weight.dtype)[:, old_in:]
     new_bias = bias.clone() if bias is not None else None
     return new_weight, new_bias
 

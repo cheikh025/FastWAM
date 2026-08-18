@@ -281,7 +281,89 @@ checkpoint-expansion process itself, or a more fundamental instability), and a
 different diagnostic (e.g. checking gradient norms/per-parameter update magnitudes
 directly during a short LIBERO-only run) would be the next step.
 
-## 10. Artifacts
+## 10. Post-hoc diagnosis (2026-08-18, later same day): the retention problem predates training entirely — Section 9's hypothesis is SUPERSEDED
+
+**Section 9's "optimizer/LR cold-start instability" hypothesis, and the exp0010
+candidate it motivated, are superseded by this finding and were never launched.**
+They are not necessarily wrong in principle (LR could still matter at the margin
+once the real bug below is fixed), but they are demonstrably **not the primary
+driver** — the evidence below shows most of the degradation is already present at
+**zero training steps**, before a single optimizer update happens.
+
+### The decisive step-0 diagnostic
+
+Ran the standard LIBERO-Spatial `candidate_screen` directly on
+`checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` — the raw
+checkpoint-expansion output, with **no training applied at all**.
+
+- command: identical to this report's Section 7 evaluation command, `ckpt` pointed
+  at the un-trained expanded checkpoint instead of exp0009's step 1000.
+- **result: 23.33% (7/30) — statistically indistinguishable from exp0009's
+  fully-trained 23.33%.** The per-task pattern also matches closely (tasks 0, 8, 9
+  at or near 0% in both).
+
+This single number falsifies Section 9's framing outright: if the degradation is
+already present before any training step runs, it cannot be caused by Adam
+cold-start bias-correction, LR magnitude, or any other training-dynamics
+mechanism. The bug is in the expanded checkpoint or the eval-side handling of it,
+not in how it's subsequently trained.
+
+### Confound elimination chain
+
+Investigated with the real user in the loop (see session transcript around
+2026-08-18 16:50-17:20 for full detail); summary:
+
+| Fix applied (cumulative) | LIBERO-Spatial (zero training) |
+|---|---:|
+| none (raw expanded checkpoint + auto-computed multi-embodiment stats) | 23.33% |
+| + use exp0019's own paired `dataset_stats.json` instead of stats freshly computed from the much smaller/differently-composed multi-embodiment LIBERO subset (1,712 vs. 11,853 episodes) | 43.33% |
+| + remove `embodiment_description` text-conditioning (a mechanism *I* added during the initial multi-embodiment implementation, motivated by Qwen-VLA but never part of FastWAM's own canonical LIBERO/RoboTwin pipeline, and never validated as an isolated candidate before being baked into the shared default config) | 56.67% |
+
+Both fixes are real and are being made permanent (config defaults), but together
+they leave a ~40pp gap to exp0019's inherited ~96.67-97.00% still unexplained.
+`mot_checkpoint_mixed_attn` and `skip_dit_load_from_pretrain`/checkpoint-loading
+completeness were also checked and ruled out with certainty (the latter via a
+direct key-set diff between the freshly-constructed model architecture and the
+checkpoint's saved `mot` state_dict: 0 missing, 0 unexpected keys out of 1649).
+
+### Root cause found: checkpoint-expansion weight initialization bug
+
+`research/tools/expand_checkpoint_for_multiembodiment.py` initialized new
+`action_encoder` **input columns** with a fresh, statistically-appropriate random
+`nn.Linear` init (documented as deliberate, to give the network "a real... init to
+learn to read the newly-added channels"). This is safe for `proprio_encoder`
+(proprio is a deterministic observation, exactly 0 at padded columns — random
+weights times exact 0 is exactly 0). It is **not** safe for `action_encoder`: its
+input is `noisy_action` from the flow-matching process
+(`fastwam.py:487-493`, `noisy_action = (1-t)*noise + t*action`), which is
+genuinely non-zero at padded columns during both training and inference (target
+`action=0` there, but the sampled `noise` is not masked to zero before mixing).
+Confirmed via code inspection that `action_dim_is_pad`/`action_is_pad` are used
+exclusively for loss weighting (`src/fastwam/utils/losses.py`) and never applied
+to zero the actual tensor values fed into the model. So the random new weight
+columns multiply real noise on every forward pass — an untrained, uncontrolled
+perturbation injected into the shared hidden representation, corrupting the
+LIBERO-valid prediction even at zero training steps. This is a genuine defect in
+"preservation of the inherited action projection weights," not a data/config
+confound.
+
+**Fix applied**: `expand_linear_input()` now defaults to `zero_init=True` —
+new `action_encoder` (and, for consistency, `proprio_encoder`) input columns are
+zero-initialized, exactly matching the already-correct treatment of the head's
+output rows. This guarantees exactly-zero contribution regardless of the noise
+value, matching the already-proven proprio guarantee, while still letting the
+network learn nonzero weights there via the masked RoboTwin loss once training
+starts.
+
+### Status
+
+Re-expanding the checkpoint with the fix and re-running the zero-training
+diagnostic to confirm recovery to near-canonical performance before any further
+training candidates are launched. Result to be recorded in a new PROGRESS report
+(0011) once available, since it applies to every future multi-embodiment
+candidate's parent checkpoint, not specifically to this one.
+
+## 11. Artifacts
 
 - training log: `checkpoints/exp0009_train.log`
 - smoke test log: `checkpoints/exp0009_smoke_train.log`
