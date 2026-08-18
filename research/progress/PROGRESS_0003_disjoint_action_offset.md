@@ -263,6 +263,32 @@ the eval or, worse, the training job itself. With training healthy and ~40 min f
 completing its full 1000-step budget, waiting for completion is safer than risking
 an expensive 4-GPU training run for an earlier partial-step checkpoint.
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies, no OOM, no disk errors.
+Final: `loss=0.2449 loss_action=0.1009 loss_video=0.1440` (lr decayed to `3.00e-07`
+per cosine schedule). Checkpoint `step_001000.pt` (12,041,907,641 bytes) written and
+verified: `action_encoder.weight` shape `(1024, 21)`, `head.weight` shape
+`(21, 1024)`, `proprio_encoder.weight` shape `(4096, 22)` (matches K=21/22 design),
+zero NaN/Inf across every `mot` tensor, `step: 1000` metadata correct. Training log:
+`checkpoints/exp0003_train.log`. Pruner/monitor stopped cleanly after confirming no
+training processes remained and all 4 GPUs returned to 0MiB/0% usage.
+
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0003, step 1000 (full budget)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0003_disjoint_offset_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0003_disjoint_offset_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0019 canonical 97.00%; setup sentinel 96.67% (29/30); exp0001 (same panel) 73.33% (22/30); exp0002 (same panel) 16.67% (5/30)
+- result: launched, awaiting completion — log at `checkpoints/exp0003_libero_screen.log`
+
 ## 7. Evaluation events
 
 None yet.
