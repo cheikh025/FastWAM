@@ -124,3 +124,27 @@ RoboTwin's own `script/_install.sh` does `git clone https://github.com/NVlabs/cu
 Official `Lifelong-Robot-Learning/LIBERO`'s `setup.py` uses `find_packages()` from repo root, which finds **zero** `libero*` packages (no top-level `libero/__init__.py` — real package root is nested `libero/libero/`). A PEP 660 editable install (`pip install -e .`) therefore produces an empty import-finder mapping and `import libero` silently fails. Fix: skip setuptools packaging, just add the repo root to a `.pth` file in site-packages so `libero` resolves as an implicit PEP 420 namespace package instead.
 
 **Second LIBERO gotcha**: `libero/libero/benchmark/__init__.py:164`'s `get_task_init_states()` calls `torch.load(init_states_path)` with no `weights_only` argument — breaks under PyTorch 2.6+, which changed the default to `weights_only=True`. Patched to `torch.load(init_states_path, weights_only=False)` directly in the cloned LIBERO repo (`/workspace/third_party_src/LIBERO`, not FastWAM's tracked source).
+
+## RoboTwin eval gotcha — dataset_stats.json auto-discovery expects the OLD unrenamed filename
+
+`experiments/robotwin/eval_robotwin_single.py::_resolve_dataset_stats_path` auto-discovers
+stats by searching checkpoint parent directories for a file literally named
+`dataset_stats.json`. This predates the distinct-per-embodiment `stats_filename` fix
+(see "Dataset-stats collision" above) that made multi-embodiment runs save
+`libero_dataset_stats.json`/`robotwin_dataset_stats.json` instead of a shared, collision-prone
+`dataset_stats.json`. Consequence: any RoboTwin eval on a checkpoint from a run that used the
+fixed, distinctly-named stats files crashes with `FileNotFoundError: Failed to locate
+dataset_stats.json` unless `EVALUATION.dataset_stats_path` is passed explicitly.
+
+**This was silently masked for exp0001**: its run directory happens to contain a leftover,
+unrenamed `dataset_stats.json` from partway through the stats-fix rollout (which happened to
+hold RoboTwin's own stats, since RoboTwin's dataset was constructed last and — pre-fix —
+overwrote the shared file), so exp0001's RoboTwin eval command worked by accident without
+`dataset_stats_path`. exp0002/exp0003/exp0004 (post-fix, no plain `dataset_stats.json` file at
+all) hit the crash directly when this was first tried for exp0004.
+
+**Fix**: always pass `EVALUATION.dataset_stats_path=<run_dir>/robotwin_dataset_stats.json`
+explicitly on every RoboTwin eval command for a multi-embodiment checkpoint — do not rely on
+auto-discovery. (The eval script's auto-discovery logic itself was not modified — fixing it to
+also try the renamed filenames would be a reasonable follow-up but wasn't needed once the
+explicit override is used.)
