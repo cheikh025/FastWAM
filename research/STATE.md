@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0006 rejected (4x training destroyed exp0004's only RoboTwin capability), investigating whether exp0004's result is even reproducible before exp0007`
+Status: `RESEARCH_LOOP_ACTIVE — exp0007 training (replicating exp0004's recipe with a larger 10-episode RoboTwin panel to test reproducibility)`
 
 ## Inherited parent reference
 
