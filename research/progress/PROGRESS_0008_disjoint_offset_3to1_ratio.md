@@ -1,18 +1,27 @@
 # PROGRESS_0008 — disjoint-offset projections, trainable backbone, 3:1 LIBERO:RoboTwin ratio
 
 - **Experiment ID:** 0008
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0007_exp0004_replication (rejected; this candidate acts on its Section 9 recommendation)
 - **Parent checkpoint:** `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` (same expanded checkpoint used for exp0003-0007 — reused)
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
-- **Git commit:** pending
+- **Git commit:** `081a6c2` (implementation); see Section 7 for follow-on commits
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (1000/1000 steps, no NaN/anomalies). LIBERO-Spatial:
+**36.67% (11/30) — worse than exp0003's 50.00%** (identical architecture, 1:1
+ratio), the opposite of the hypothesis that more LIBERO rehearsal would protect
+retention. RoboTwin progress check: **0.0% on all 4 measurements** (`adjust_bottle`
+and `click_alarmclock`, clean and random), confirmed via raw result files — the
+first candidate to show zero capability on *both* tested tasks simultaneously.
+**Decision: `REJECT`** — this candidate underperforms on both LIBERO and RoboTwin
+axes at once. See Section 7 for full results and Section 9 for the investigation
+this surprising result triggered (a previously-missing LIBERO-only continued-
+training control, proposed as exp0009).
 
 ## 2. Research state before experiment
 
@@ -212,3 +221,81 @@ LIBERO-Spatial screen launched on GPUs 0-1. RoboTwin progress check will be run
   negative result that refutes the ratio hypothesis as tested and needs
   interpretation (see Section 9) before choosing exp0009 — not a simple
   confirm/deny of "more rehearsal helps."
+
+### Evaluation event — RoboTwin `progress_check`
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0008, step 1000
+- exact command (per-task, `CUDA_VISIBLE_DEVICES=0`/`=1`, run after the LIBERO screen finished, not in parallel — per the documented GPU-pinning gotcha in `research/NOTES.md`):
+  ```bash
+  CUDA_VISIBLE_DEVICES=<0|1> python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0008_3to1_ratio_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0008_3to1_ratio_v1/robotwin_dataset_stats.json \
+    EVALUATION.task_name=<adjust_bottle|click_alarmclock> EVALUATION.eval_num_episodes=3 \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+- **result (confirmed via raw `_result_*.txt` files): 0.0% on all 4 measurements** (`adjust_bottle` clean/random, `click_alarmclock` clean/random).
+- reference: exp0004 (33.3%/33.3%, frozen backbone, 1:1); exp0007 (20.0%/10.0% confirmed at n=10, frozen backbone, 1:1) — both frozen-backbone-family candidates at 1:1 ratio. exp0008 has BOTH a different backbone treatment (trainable, matching exp0001/exp0003) AND a different ratio (3:1) simultaneously, so this result cannot isolate which factor (backbone plasticity vs. ratio vs. ~3x fewer realized RoboTwin steps, ~250 vs ~500) drove the drop to zero — it is consistent with any of them, or their combination.
+- runtime: ~35 minutes
+- validity checks: correct checkpoint/stats paths; `unseen` instruction type; all phases completed (`manager finished successfully` for both); results verified directly from raw files.
+- decision enabled by this evidence: `DIAGNOSE` — combined with the LIBERO regression, this candidate underperforms on both axes simultaneously. See Section 9.
+
+## 8. Decision
+
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no
+- **All five LIBERO >=90% canonical:** no (36.67% Spatial sentinel, below floor, worse than exp0003's 50.00% at the same architecture)
+- **Reason:** LIBERO retention regressed relative to the same architecture at 1:1 ratio, and RoboTwin capability dropped to zero on both tested tasks — this candidate underperforms on both axes simultaneously, the opposite of its intended purpose.
+- **Checkpoint/branch to preserve:** none; not promoted. Checkpoint removed after evidence capture.
+- **Next main-line parent:** unchanged — exp0019.
+
+## 9. What this changes for the next experiment
+
+The ratio hypothesis, as tested, is refuted: shifting toward more LIBERO rehearsal
+(3:1 vs. 1:1) made LIBERO retention *worse*, not better, while also eliminating
+RoboTwin capability. This is worth taking seriously rather than dismissing as pure
+noise (13.3pp aggregate drop, and a clean 0% across all 4 RoboTwin measurements
+where the frozen-backbone family at 1:1 consistently showed some signal) — but the
+mechanism is genuinely unclear from the evidence so far.
+
+**A critical gap in the evidence base, only now apparent**: across all 8 candidates
+in this project, *every single one* has trained on a LIBERO+RoboTwin mixture at some
+ratio (1:1, or now 3:1) — **none has established a LIBERO-only continued-training
+control** using the same K=21/22 disjoint-offset architecture. This means the
+project has never actually confirmed that the retention problem is a genuine
+*multi-embodiment interference* phenomenon at all, as opposed to a more basic fact
+about continuing to fine-tune the expanded/padded checkpoint on *any* data,
+including LIBERO's own. If simply resuming from `exp0019_expanded_k21_disjoint` and
+continuing to train on LIBERO alone (zero RoboTwin exposure) *also* degrades
+LIBERO-Spatial retention below exp0019's inherited ~96.67%, that would mean:
+
+- the "interference" framing that has driven candidate selection since exp0002 (projection overlap, backbone drift, mixing ratio) is at best a secondary factor;
+- the primary driver is more likely continued-training drift from *any* gradient updates on the K=21/22 architecture (whether from generic optimization dynamics, a subtly different effective LR/schedule than exp0019's own original training used, or something about the expanded/padded interface itself), independent of RoboTwin;
+- exp0001's comparatively strong 73.33% might be better explained by *some other* difference in its setup (e.g. K=14 vs K=21/22 widening degree, or simply favorable variance) rather than its overlapping-projection design being uniquely protective.
+
+If, conversely, a LIBERO-only control *does* reproduce something close to exp0019's
+original ~96.67% (or at least clears 90%), that cleanly confirms RoboTwin's presence
+in the training mixture — via whichever mechanism (ratio, backbone drift, or
+something not yet isolated) — is the actual, necessary cause of the retention
+problem, and future candidates should continue targeting the mixing/interference
+axis rather than suspecting the architecture or continued-training setup itself.
+
+**Recommended exp0009**: a LIBERO-only continued-training control — resume from
+`checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt` (the same K=21/22
+disjoint-offset checkpoint every recent candidate has used), train on LIBERO data
+alone (no RoboTwin in the mixture at all) for 1000 steps at the same LR/schedule,
+then measure LIBERO-Spatial retention. This is also the cheapest candidate possible
+in this project so far — no RoboTwin dataset loading, no RoboTwin evaluation needed,
+likely faster per-step than any prior candidate (LIBERO's dataset and per-sample
+cost are both much smaller than RoboTwin's) — and it directly answers a foundational
+question the whole research loop has been assuming rather than verifying.
+
+## 10. Artifacts
+
+- training log: `checkpoints/exp0008_train.log`
+- smoke test log: `checkpoints/exp0008_smoke_train.log`
+- LIBERO screen log: `checkpoints/exp0008_libero_screen.log`
+- LIBERO screen raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_145630/`
+- RoboTwin progress-check logs: `checkpoints/exp0008_robotwin_adjust_bottle.log`, `checkpoints/exp0008_robotwin_click_alarmclock.log`
+- RoboTwin progress-check raw results: `evaluate_results/robotwin/reweighted_multiembodiment_exp0008_3to1_ratio_v1/20260818_150838/`
+- expanded parent checkpoint used: `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt`
