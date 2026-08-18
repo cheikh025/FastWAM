@@ -203,7 +203,65 @@ None of these anomalies indicate a problem with the padded multi-embodiment *tra
 
 ## 7. Evaluation events
 
-TBD.
+### Event 1 — `candidate_screen` (LIBERO-Spatial retention sentinel)
+
+- benchmark: `libero`
+- checkpoint / training step: exp0001, step 1000 (`runs/reweighted_multiembodiment/exp0001_padded_baseline_v2/checkpoints/weights/step_001000.pt`)
+- decision this evaluation was meant to inform: whether the padded multi-embodiment interface preserved LIBERO retention after real training
+- exact task/suite/difficulty coverage: all 10 LIBERO-Spatial tasks (same panel as setup's sentinel, for a direct apples-to-apples comparison)
+- trials per task: 3 (30 episodes total)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0001_padded_baseline_v2/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0001_padded_baseline_v2/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2
+  ```
+- reference: setup's own 3-trial sentinel on the exp0019 parent (same panel, same trial count) = **96.67% (29/30)**; exp0019 canonical (50-trial) = **97.00%**
+- **candidate result: 73.33% (22/30) — a real, substantial drop of ~23 percentage points from both references.**
+- per-task breakdown:
+
+  | Task | exp0019 setup sentinel (3-trial) | exp0001 (3-trial) |
+  |---|---:|---:|
+  | task0 "bowl between plate/ramekin" | 100% | 66.7% |
+  | task1 "bowl next to ramekin" | 100% | 100% |
+  | task2 "bowl from table center" | 100% | 100% |
+  | task3 "bowl on cookie box" | 100% | 100% |
+  | task4 "bowl in top drawer" (exp0019's known historically-weakest task) | 66.7% | **0%** |
+  | task5 "bowl on ramekin" (exp0019's second-weakest task) | 100% | **33.3%** |
+  | task6 "bowl next to cookie box" | 100% | 66.7% |
+  | task7 "bowl on stove" | 100% | 66.7% |
+  | task8 "bowl next to plate" | 100% | 100% |
+  | task9 "bowl on wooden cabinet" | 100% | 100% |
+
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_014633/`
+- runtime: ~33 minutes
+- validity checks: 10/10 task result files present, 0 failed tasks, aggregate recomputed matches `summary.json`'s reported 73.33%; correct checkpoint loaded (path/step verified in `summary.json`); the eval-side padding/cropping/embodiment-conditioning fixes (see commit `d7f8323`) and the corrected, recomputed LIBERO normalization stats (commit `912c3b0`) were both in place for this run — this result is not an artifact of a known eval-harness bug.
+- decision enabled by this evidence: **`DIAGNOSE`** — this is a real, concerning retention signal, not conclusively either "reject the whole approach" or "ignore and continue." The exact same tasks that were already exp0019's weakest (task4, task5) degraded the most (to 0% and 33%), which is a specific, interpretable pattern (interference concentrated on already-marginal skills) rather than uniform random collapse — worth root-causing with `$investigate-fastwam-problem` before deciding whether to continue this exact recipe, adjust it (e.g. shorter training, backbone freezing per the literature review's staged-training recommendation, explicit LIBERO replay weighting), or the interface itself needs correction.
+- reason: a 3-trial sentinel cannot itself justify `REJECT` (too few trials per task for a fully confident per-task readout) but the AGGREGATE 30-episode drop (29/30 -> 22/30) is far beyond plausible trial-count noise at this sample size, and the concentration on already-weak tasks is a real, structured signal worth investigating now rather than spending more compute on a longer run of the same recipe first.
+
+### Event 2 — `progress_check` (RoboTwin — first-ever policy-in-the-loop evaluation for this project)
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0001, step 1000
+- decision this evaluation was meant to inform: whether the multi-embodiment training produced ANY RoboTwin capability at all
+- exact task/difficulty coverage: 2 of the 50 canonical tasks (`adjust_bottle`, `click_alarmclock`), both `demo_clean` and `demo_randomized` phases
+- trials/episodes: 3 per task per phase (overridden down from the canonical 100 via `EVALUATION.eval_num_episodes=3`)
+- exact command (run per-task, each pinned to its own GPU via `CUDA_VISIBLE_DEVICES`):
+  ```bash
+  python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0001_padded_baseline_v2/checkpoints/weights/step_001000.pt \
+    EVALUATION.task_name=<adjust_bottle|click_alarmclock> EVALUATION.eval_num_episodes=3 \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+- reference: none — no prior RoboTwin evidence exists for this project (exp0019 is LIBERO-only; the public FastWAM RoboTwin specialist checkpoint was not run as a reference for this event, to save compute given the result was already unambiguous)
+- **candidate result: 0.0% across every measurement that completed** — `adjust_bottle` clean (0/3, plus an earlier partial 0/2 reading before an infra crash, both 0%), `click_alarmclock` clean (0/3) and randomized (0/3).
+- raw results path: `evaluate_results/robotwin/reweighted_multiembodiment_exp0001_padded_baseline_v2/20260818_015912/{adjust_bottle,click_alarmclock}/_result_{clean,random}.txt`
+- runtime: ~27 minutes total (both tasks in parallel)
+- infra anomalies (recorded, not swept under the rug): (1) a Vulkan `ErrorDeviceLost` crash terminated `click_alarmclock`'s process after both its results were already durably saved (the crash happened during a later, additional phase attempt inside the manager's retry logic — the saved clean/random results themselves were not affected); (2) `adjust_bottle`'s randomized phase hit a CUDA OOM caused by **orphaned zombie processes from an earlier, misconfigured launch attempt** (before I added explicit `CUDA_VISIBLE_DEVICES` pinning — two manager processes both defaulted to internal `gpu=0` and collided; killing the top-level PIDs did not clean up their spawned children, which kept holding ~20GB each on GPU 0 for the subsequent run). Killed the orphaned processes and confirmed all 4 GPUs cleared afterward. Neither anomaly affects the validity of the 4 completed 0.0% measurements.
+- validity checks: correct checkpoint path in every launch command; `unseen` instruction type confirmed in the raw result files (matches the frozen canonical setting); per-task result files present for every measurement reported above.
+- decision enabled by this evidence: **`DIAGNOSE`**, combined with Event 1. Zero RoboTwin success after only 1000 steps is not surprising on its own (RoboTwin's action channels 7-13 for the bimanual second arm, and channels 0-13 generally, were only randomly-initialized-then-lightly-trained for ~500 of the 1000 total steps given the ~1:1 interleaving — this is a small fraction of what the original 64-GPU RoboTwin specialist training used) — the concerning finding is Event 1's LIBERO regression happening *simultaneously* with zero RoboTwin gain, i.e. this candidate currently shows cost without benefit. Whether more training alone would fix both, or whether the training recipe/interface needs adjustment first, is exactly the open question for `$investigate-fastwam-problem`.
+- reason: same as above — this is progress-check-grade evidence (2 of 50 tasks, 3 trials), sufficient to establish "no RoboTwin capability yet" but not to characterize RoboTwin performance broadly; not canonical, not promotion-relevant on its own.
 
 ## 8. Comparison and interpretation
 
