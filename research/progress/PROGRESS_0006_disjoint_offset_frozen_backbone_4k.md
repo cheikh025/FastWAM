@@ -218,3 +218,28 @@ noisier than the full screen used for final candidate evaluation.
 - per-task: 8 of 10 tasks at 100% (1/1), 2 at 0% — `libero_spatial_4` (the task that is 0% in *every* multi-embodiment candidate so far, including the baseline's own weakest at 66.7%) and `libero_spatial_1` (0% here; was 100% for exp0004 at step 1000, so likely just single-trial noise, not a real regression).
 - context: this is a noisier 1-trial/task panel (10 episodes total, vs. the standard 3-trial/30-episode `candidate_screen`), so not directly comparable in precision to exp0004's step-1000 63.33% (from a 3-trial panel) — but as a rough training-control signal, 80% at step 1500 is a healthy, non-degrading sign that retention has not collapsed under continued training on this recipe.
 - decision enabled by this evidence: **`CONTINUE_TRAINING`** — no sign of divergence or collapse at the halfway-ish point; let the run continue toward 4000 steps and evaluate properly (full 3-trial screen + RoboTwin progress check) on the final checkpoint.
+
+### Training completion
+
+All 4000 steps completed cleanly, no NaN/Inf, no anomalies throughout (matches the
+step-1500/1780/3270 healthy check-ins along the way). Final: `loss=0.4546
+loss_action=0.2080 loss_video=0.2466` (lr decayed to `3.00e-07`). Total wall-clock:
+~2h33m (08:54 -> 11:27), matching the ~0.44 step/s pace observed throughout.
+Checkpoint `step_004000.pt` (12,042,248,688 bytes) verified: shapes
+`(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf, `step: 4000`. Pruner/monitor
+stopped cleanly; all 4 GPUs confirmed at 0MiB/0% after training exited.
+
+### Evaluation event — LIBERO-Spatial `candidate_screen` (final)
+
+- benchmark: `libero`
+- checkpoint / training step: exp0006, step 4000 (full 4x budget)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/checkpoints/weights/step_004000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0006_disjoint_offset_frozen_backbone_4k_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0019 canonical 97.00%; exp0004 (step 1000, same recipe) 63.33%; exp0006 mid-run (step 1500, 1-trial) 80.00%
+- result: launched, awaiting completion — log at `checkpoints/exp0006_libero_screen_final.log` (pruner is stopped, no race risk this time)
