@@ -123,7 +123,35 @@ Not applicable — setup already validated; no infrastructure changes this candi
 
 ## 6. Training execution and control timeline
 
-Not yet launched.
+### Training smoke test (pre-launch validation) — PASS
+
+8 steps, sane losses matching exp0003's smoke test step-1 loss exactly (`1.2713`,
+confirming deterministic forward-pass reproducibility given the same resumed
+checkpoint), no NaN/Inf. Confirmed via log line `Freezing shared MoT backbone;
+trainer.py:341` (appeared twice — pre- and post-`accelerator.prepare()`, matching
+the re-application-after-wrap discipline already verified in exp0002) that freezing
+was actually applied for this candidate — a different log message than exp0002's
+("Setting DiT to train mode...") but the correct one for `trainable_modules:
+expanded_projections_only`. Checkpoint verified: `action_encoder.weight` shape
+`(1024, 21)`, `head.weight` shape `(21, 1024)`, `proprio_encoder.weight` shape
+`(4096, 22)` (K=21/22, matching exp0003's design), zero NaN/Inf. Smoke-test run
+directory deleted after verification; log at `checkpoints/exp0004_smoke_train.log`.
+
+### Real training run
+
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_frozen_backbone_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0004_disjoint_offset_frozen_backbone_v1 \
+    save_every=200 \
+    wandb.name=exp0004_disjoint_offset_frozen_backbone
+  ```
+- start time: 2026-08-18 05:48 UTC (immediately following the smoke test)
+- number of GPUs/world size: 4 (DeepSpeed ZeRO-1)
+- training log: `checkpoints/exp0004_train.log`
+- disk safety: background pruner (`checkpoints/prune_checkpoints_exp0004.log`), `KEEP=1`, 15s polling, 45GB free at launch
+- monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
 
 ## 7. Evaluation events
 
