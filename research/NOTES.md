@@ -204,3 +204,45 @@ pattern (`CUDA_VISIBLE_DEVICES=0` and `=1` for the two RoboTwin tasks) and eithe
 run RoboTwin sequentially after any other GPU-occupying job finishes, or verify
 the manager's actual GPU-selection code path before trying a different pinning
 scheme.
+
+## Training gotcha — removing `embodiment_description` stales the RoboTwin text-embedding cache
+
+`PROGRESS_0011` removed `embodiment_description` (a self-introduced textual conditioning
+mechanism) from the multi-embodiment data configs. This is correct for LIBERO/RoboTwin
+*evaluation* (which calls the text encoder live, no cache involved) but it silently broke
+*training*: the RoboTwin text-embedding cache (`./data/text_embeds_cache/robotwin/`, ~921k
+files, ~900GB) had been precomputed by a dedicated custom tool
+(`research/tools/precompute_multiembodiment_text_embeds.py`) that specifically replicated
+`augment_instruction()`'s *embodiment_description-prefixed* string before hashing it for the
+cache filename. With `embodiment_description` removed, `augment_instruction()` now produces
+the plain (unprefixed) instruction at training time, so every RoboTwin prompt's SHA256 hash
+changed -- the entire RoboTwin cache became stale in one commit, not a small gap.
+
+Symptom: `scripts/train.py` crashes a few minutes into a real training run (past model
+construction, mid-dataloading) with `FileNotFoundError: Missing text embedding cache: ...`.
+The dataset's own fallback (`RobotVideoDataset.__getitem__` retries once with a random
+index on any exception) is not robust to a near-100%-stale cache -- it just fails on the
+retry too and crashes the whole distributed job.
+
+LIBERO's cache (`./data/text_embeds_cache/libero/`) was unaffected -- it was originally
+computed for single-embodiment LIBERO training, which never used `embodiment_description`,
+so it already matched the plain format.
+
+**Fix**: recompute RoboTwin's cache with the plain prompt format. Since `embodiment_description`
+is now removed, the *generic*, existing `scripts/precompute_text_embeds.py` tool (which never
+included embodiment conditioning to begin with) now produces the correct hashes directly --
+no need for the custom multiembodiment-specific script anymore:
+```bash
+torchrun --standalone --nproc_per_node=4 scripts/precompute_text_embeds.py task=<multiembodiment_task_name>
+```
+Note this recomputes *all* discovered prompts (including LIBERO's, redundantly but harmlessly,
+since `overwrite=True` in the current script) -- budget the full ~35-40 minutes the original
+precompute took, not a quick backfill.
+
+**Lesson for future config changes**: any change to `FastWAMProcessor.augment_instruction()`'s
+output (which text conditioning is prepended, dropped, or reworded) invalidates the text-embedding
+cache for every dataset using that processor config, since the cache key is a hash of the exact
+runtime prompt string. Check whether a cache needs recomputing *before* launching a real training
+run whenever `embodiment_description` or similar instruction-augmentation settings change --
+don't assume the cache is still valid just because the underlying raw task/instruction data
+didn't change.
