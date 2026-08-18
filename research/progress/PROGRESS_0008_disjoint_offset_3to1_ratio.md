@@ -168,4 +168,47 @@ LIBERO-Spatial screen launched on GPUs 0-1. RoboTwin progress check will be run
 
 ## 7. Evaluation events
 
-None yet.
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0008, step 1000
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0008_3to1_ratio_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0008_3to1_ratio_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0001 (73.33%, best-so-far); exp0003 (50.00%, same architecture at 1:1 ratio)
+- **result: 36.67% (11/30) — WORSE than exp0003's 50.00%, the opposite of the hypothesis.** Shifting the mixing ratio toward more LIBERO rehearsal (3:1 instead of 1:1), holding architecture fixed (trainable backbone, disjoint-offset projections), made LIBERO retention *worse*, not better.
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_145630/`
+- runtime: ~37 minutes
+- per-task breakdown vs. exp0003 (same architecture, 1:1 ratio):
+
+  | Task | exp0003 (1:1) | exp0008 (3:1) |
+  |---|---:|---:|
+  | task0 | 0% | 0% |
+  | task1 | 33.3% | 0% |
+  | task2 | 100% | 66.7% |
+  | task3 | 100% | 33.3% |
+  | task4 | 0% | 0% |
+  | task5 | 0% | 100% |
+  | task6 | 100% | 66.7% |
+  | task7 | 0% | 66.7% |
+  | task8 | 100% | 0% |
+  | task9 | 66.7% | 33.3% |
+  | **Overall** | **50.0%** | **36.7%** |
+
+  Not a uniform decline — task5/task7 *improved* substantially (0%->100%, 0%->66.7%)
+  while task3/task8 dropped sharply (100%->33.3%, 100%->0%). This scattered,
+  task-swapping pattern (not a clean monotonic worsening) is consistent with the
+  high per-task variance already seen throughout this project's evidence base
+  (n=3 trials, quantized outcomes), though the *aggregate* drop (50.0%->36.7%,
+  13.3pp) is large enough that it plausibly reflects a genuine effect, not pure
+  noise, on top of that variance — n=2 data points for this exact architecture
+  (exp0003 at 1:1, exp0008 at 3:1) is not enough to fully separate the two.
+- decision enabled by this evidence: this is a genuinely surprising, important
+  negative result that refutes the ratio hypothesis as tested and needs
+  interpretation (see Section 9) before choosing exp0009 — not a simple
+  confirm/deny of "more rehearsal helps."
