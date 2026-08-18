@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0002 rejected, diagnosing next candidate`
+Status: `RESEARCH_LOOP_ACTIVE — exp0003 (disjoint_action_offset) implemented, launching training`
 
 ## Inherited parent reference
 
@@ -70,7 +70,7 @@ None yet — `autoresearch/robotwin-multiembodiment-v1` is the sole active branc
 
 ## Latest experiment
 
-`0002_frozen_backbone_warmup` — `REJECT`. Full report: `research/progress/PROGRESS_0002_frozen_backbone_warmup.md`. Next candidate not yet chosen — see "Current research notes" for the leading re-diagnosis.
+`0003_disjoint_action_offset` — `PLANNED`, implementation complete, training not yet launched. Full report: `research/progress/PROGRESS_0003_disjoint_action_offset.md`. Directly targets the exp0001/exp0002 re-diagnosis: `action_encoder`/`head`/`proprio_encoder` are shared weight matrices; LIBERO and RoboTwin were both left-aligned at column offset 0, so RoboTwin's real (non-padded) forward values fully overlapped LIBERO's valid columns and RoboTwin's gradient directly overwrote weight positions LIBERO depends on. Fix: disjoint per-embodiment column ranges within a widened shared tensor (K 14->21 action / 14->22 proprio; LIBERO stays at offset 0, RoboTwin moves to offset 7/8) via new `ConcatLeftAlign.action_offset`/`state_offset` params — proven interference-free by a new gradient-isolation unit test. No model/trainer/checkpoint-format/dataset-pipeline changes needed (an earlier in-session attempt at a fully-separate-per-embodiment-weights design was reverted once this much smaller fix was worked out). Next: re-run `expand_checkpoint_for_multiembodiment.py` against the original exp0019 checkpoint (currently re-downloading) with `--new-action-dim 21 --new-proprio-dim 22`, then launch training via `configs/task/multiembodiment_libero_robotwin_disjoint_offset_3e-5.yaml`.
 
 ## Experiment history
 

@@ -1,11 +1,13 @@
 # @package _global_
 #
-# Evaluation-only task config for scoring an exp0001-family (shared padded K=14
-# multi-embodiment) checkpoint on LIBERO. Uses the same K=14-padded, embodiment-
-# conditioned LIBERO data/processor config as training
-# (configs/data/libero_2cam_multiembodiment.yaml) and the matching K=14 model config
-# (configs/model/fastwam_multiembodiment.yaml) — a plain `libero_uncond_2cam224_1e-4`
-# eval would build a 7-dim model and crash loading a 14-dim checkpoint.
+# Evaluation-only task config for scoring a shared-padded-multi-embodiment
+# checkpoint on LIBERO. Uses the same padded, embodiment-conditioned LIBERO
+# data/processor config as training (configs/data/libero_2cam_multiembodiment.yaml)
+# and the matching model config (configs/model/fastwam_multiembodiment.yaml) — a
+# plain `libero_uncond_2cam224_1e-4` eval would build a 7-dim model and crash loading
+# a wider-K checkpoint. Current shared dims: action K=21, state K=22 (LIBERO at
+# offset 0, RoboTwin at offset 7/8 — see PROGRESS_0003); exp0001/exp0002 used K=14
+# with both embodiments left-aligned at offset 0.
 #
 # Not a training config (batch_size/scheduler fields below are placeholders required
 # by shared Hydra schema, unused by experiments/libero/run_libero_manager.py).

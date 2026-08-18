@@ -1,0 +1,59 @@
+# @package _global_
+#
+# exp0003 (PROGRESS_0003_disjoint_action_offset): re-diagnosis of exp0001/exp0002's
+# LIBERO regression. `action_encoder`/`head`/`proprio_encoder` are single shared
+# weight matrices; exp0001/exp0002 left-aligned BOTH embodiments' natural channels at
+# column 0 (LIBERO occupies [0:7]/[0:8], RoboTwin occupies [0:14]/[0:14] since its
+# natural dim equals K=14). RoboTwin's real (non-padded) forward values therefore
+# fully overlapped LIBERO's valid columns, so RoboTwin's gradient at those columns
+# directly overwrote weight positions LIBERO's forward pass depends on -- regardless
+# of the (correctly-implemented) per-channel loss masking, which only protects each
+# embodiment's own padding-only positions, not positions the other embodiment
+# considers valid. Freezing the backbone (exp0002) made this WORSE, not better,
+# because there was no longer any downstream plasticity to absorb the shift --
+# confirming the interference is at the projection-weight level, not the backbone.
+#
+# Fix: give each embodiment a disjoint column range within the same shared K-wide
+# tensor (LIBERO [0:7]/[0:8], RoboTwin [7:21]/[8:22], K grows from 14 to 21/22) via
+# `ConcatLeftAlign.action_offset`/`state_offset` (see
+# src/fastwam/datasets/lerobot/transforms/action_state_merger.py). This is
+# mathematically equivalent to fully separate per-embodiment weight matrices: for a
+# shared Linear, a given weight column/row's gradient is exactly zero whenever that
+# embodiment's corresponding input/output slice is exactly zero, which now holds for
+# every column outside an embodiment's own offset range. No changes needed to
+# action_dit.py/fastwam.py model code, checkpoint save/load, the dataset pipeline, or
+# the trainer -- only the padding config and a re-expanded checkpoint (see
+# research/tools/expand_checkpoint_for_multiembodiment.py, re-run with
+# --new-action-dim 21 --new-proprio-dim 22 against the ORIGINAL (unexpanded) exp0019
+# checkpoint, not the old K=14 expansion, so LIBERO's inherited weights land at their
+# unchanged [0:7]/[0:8] position and RoboTwin's new [7:21]/[8:22] columns get a fresh
+# from-scratch init).
+#
+# Otherwise identical to configs/task/multiembodiment_libero_robotwin_3e-5.yaml
+# (full fine-tune, no backbone freezing -- exp0001's setting, not exp0002's, since
+# freezing was refuted as a fix and full fine-tune gives the backbone room to adapt
+# to RoboTwin's visual domain).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 100
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null

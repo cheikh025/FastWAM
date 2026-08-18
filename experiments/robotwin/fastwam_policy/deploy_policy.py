@@ -203,13 +203,17 @@ class WorldActionRobotWinPolicy:
         state_batch = self.processor.normalizer.forward(state_batch)
         result = state_batch["state"][state_key]
 
-        # Shared padded multi-embodiment interface (no-op for RoboTwin today, since
-        # its natural state dim already equals K=14 — kept for consistency/defense in
-        # depth, see the identical fix in experiments/libero/eval_libero_single.py).
+        # Shared padded multi-embodiment interface: place RoboTwin's natural-dim state
+        # at its `state_offset` within the shared K-wide tensor, zero-padding the rest
+        # (see the identical fix in experiments/libero/eval_libero_single.py and
+        # PROGRESS_0003 for why a per-embodiment offset, not just left-aligned
+        # zero-padding, is required).
         merger = getattr(self.processor, "action_state_merger", None)
         target_dim = getattr(merger, "state_target_dim", None) if merger is not None else None
+        offset = int(getattr(merger, "state_offset", 0) or 0) if merger is not None else 0
         if target_dim is not None and result.shape[-1] < target_dim:
-            result = torch.nn.functional.pad(result, (0, target_dim - result.shape[-1]))
+            native_dim = result.shape[-1]
+            result = torch.nn.functional.pad(result, (offset, target_dim - native_dim - offset))
 
         return result
 
@@ -227,11 +231,14 @@ class WorldActionRobotWinPolicy:
         natural_dim = int(action_meta[0]["shape"])
         action = action.to(dtype=torch.float32, device="cpu")
 
-        # Shared padded multi-embodiment interface (no-op for RoboTwin today, since
-        # its natural action dim already equals K=14 — see the identical fix in
-        # experiments/libero/eval_libero_single.py).
+        # Shared padded multi-embodiment interface: crop the model's K-wide output
+        # back to RoboTwin's `[action_offset, action_offset+natural_dim)` slice (see
+        # the identical fix in experiments/libero/eval_libero_single.py and
+        # PROGRESS_0003).
+        merger = getattr(self.processor, "action_state_merger", None)
+        offset = int(getattr(merger, "action_offset", 0) or 0) if merger is not None else 0
         if action.shape[-1] > natural_dim:
-            action = action[..., :natural_dim]
+            action = action[..., offset:offset + natural_dim]
 
         normalizer = self.processor.normalizer.normalizers["action"][action_key]
         denorm = normalizer.backward(action)

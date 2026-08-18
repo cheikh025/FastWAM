@@ -36,18 +36,29 @@ train:
     shape_meta: ${data.train.shape_meta}
     num_obs_steps: ${data.train.num_frames}
     num_output_cameras: 3
-    action_output_dim: 14 # already RoboTwin's natural dim; padding to K=14 is a no-op
-    proprio_output_dim: 14
+    action_output_dim: 21 # shared padded K = 7 (LIBERO) + 14 (RoboTwin); RoboTwin's 14 natural channels occupy [7:21]
+    proprio_output_dim: 22 # shared padded K = 8 (LIBERO) + 14 (RoboTwin); RoboTwin's 14 natural channels occupy [8:22]
 
     action_state_transforms: null
     use_stepwise_action_norm: False
     norm_default_mode: "z-score"
     norm_exception_mode: null
 
+    # RoboTwin's natural channels are offset to a column range disjoint from LIBERO's
+    # (action [7:21], state [8:22]) instead of both being left-aligned at column 0.
+    # With overlapping ranges, RoboTwin's real (non-padded) forward values occupied
+    # the same shared action_encoder/head weight columns LIBERO's channels depend on,
+    # so RoboTwin's gradient directly overwrote them regardless of loss masking --
+    # this was the diagnosed cause of exp0001/exp0002's LIBERO collapse (see
+    # PROGRESS_0002 Section 10 and PROGRESS_0003). A disjoint offset makes each
+    # column's input provably zero for the other embodiment's batches, so its
+    # gradient there is exactly zero -- interference-free without separate weights.
     action_state_merger:
       _target_: fastwam.datasets.lerobot.transforms.action_state_merger.ConcatLeftAlign
-      action_target_dim: 14
-      state_target_dim: 14
+      action_target_dim: 21
+      state_target_dim: 22
+      action_offset: 7
+      state_offset: 8
 
     # Qwen-VLA-style textual embodiment conditioning — RoboTwin's embodiment is the
     # bimanual ALOHA-AgileX robot (confirmed during setup via

@@ -180,16 +180,19 @@ def _normalize_proprio(
     state_batch = processor.normalizer.forward(state_batch)
     state = state_batch["state"][state_key]
 
-    # Shared padded multi-embodiment interface: pad the natural-dim state up to the
-    # merger's `state_target_dim` (K) with zeros, matching training's
-    # `action_state_merger.forward()` (see fastwam.utils.losses / research/RUNBOOK.md
-    # "Shared padded action representation"). No-op when no padding is configured
-    # (state_target_dim is None or already equals the natural dim).
+    # Shared padded multi-embodiment interface: place the natural-dim state at this
+    # embodiment's `state_offset` within the merger's `state_target_dim` (K),
+    # zero-padding the rest, matching training's `action_state_merger.forward()`
+    # (see fastwam.utils.losses / research/RUNBOOK.md "Shared padded action
+    # representation" and PROGRESS_0003 for why the offset -- not just left-aligned
+    # zero-padding -- matters). No-op when no padding is configured (state_target_dim
+    # is None or already equals the natural dim).
     merger = getattr(processor, "action_state_merger", None)
     target_dim = getattr(merger, "state_target_dim", None) if merger is not None else None
+    offset = int(getattr(merger, "state_offset", 0) or 0) if merger is not None else 0
     if target_dim is not None and state.shape[-1] < target_dim:
-        pad_dim = target_dim - state.shape[-1]
-        state = torch.nn.functional.pad(state, (0, pad_dim))
+        native_dim = state.shape[-1]
+        state = torch.nn.functional.pad(state, (offset, target_dim - native_dim - offset))
 
     return state
 
@@ -286,12 +289,14 @@ def _denormalize_action(action: torch.Tensor, processor: FastWAMProcessor) -> np
     action = action.to(dtype=torch.float32, device="cpu")
 
     # Shared padded multi-embodiment interface: crop the model's K-wide output back
-    # to this embodiment's natural action dim BEFORE denormalizing, mirroring
-    # training's `action_state_merger.backward()` (crop happens before un-normalize
-    # in `FastWAMProcessor.postprocess()`). No-op when no padding was used (the model
-    # output is already at the natural dim).
+    # to this embodiment's `[action_offset, action_offset+natural_dim)` slice BEFORE
+    # denormalizing, mirroring training's `action_state_merger.backward()` (crop
+    # happens before un-normalize in `FastWAMProcessor.postprocess()`). No-op when no
+    # padding was used (the model output is already at the natural dim).
+    merger = getattr(processor, "action_state_merger", None)
+    offset = int(getattr(merger, "action_offset", 0) or 0) if merger is not None else 0
     if action.shape[-1] > natural_dim:
-        action = action[..., :natural_dim]
+        action = action[..., offset:offset + natural_dim]
 
     normalizer = processor.normalizer.normalizers["action"][action_key]
     denorm = normalizer.backward(action)

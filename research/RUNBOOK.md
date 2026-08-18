@@ -156,9 +156,48 @@ Before first multi-embodiment modification:
 
 Ground-truth dimensions (confirmed from both configs and checkpoint tensors, two independent sources): LIBERO action_dim=7 / proprio_dim=8; RoboTwin action_dim=14 / proprio_dim=14.
 
+**Superseded by PROGRESS_0003 (see below in this section for the current design).** This
+subsection is kept as the original setup-time record for provenance; K=14 with both
+embodiments left-aligned at offset 0 was implemented and used for exp0001/exp0002, and
+was diagnosed as the direct cause of both candidates' LIBERO regression.
+
 - shared channel dimension K: **K=14** proposed (RoboTwin's natural dimension is the larger of the two for both action and proprio — LIBERO's 7/8 pad up to 14/14). Not yet finalized in code.
 - LIBERO valid channels and mask: first 7 of 14 action channels valid (delta-eef x6 + gripper x1), remaining 7 padding; first 8 of 14 proprio channels valid.
 - RoboTwin valid channels and mask: all 14 action and 14 proprio channels valid (no padding needed for RoboTwin under K=14).
+
+**exp0003 revision — disjoint per-embodiment column offsets.** exp0001 (full
+fine-tune) and exp0002 (frozen backbone) both left LIBERO-Spatial well below the
+90% floor (73.33% and 16.67% respectively, vs. 96.67% for the parent). Root cause:
+`action_encoder`/`head`/`proprio_encoder` are single shared weight matrices; with
+both embodiments left-aligned at offset 0, RoboTwin's real (non-padded) forward
+values fully occupied LIBERO's valid columns too (LIBERO=[0:7]/[0:8] action/proprio,
+RoboTwin=[0:14]/[0:14] — a strict superset), so RoboTwin's gradient at those columns
+directly overwrote weight positions LIBERO's forward pass depends on, regardless of
+the (correctly-implemented) per-channel loss masking. Freezing the backbone (exp0002)
+made this worse, not better, confirming the interference is at the projection-weight
+level, not the shared MoT backbone.
+
+Fix (exp0003): assign each embodiment a **disjoint** column range within a widened
+shared tensor instead of left-aligning both at 0 — LIBERO keeps `[0:7]`/`[0:8]`
+(offset 0, unchanged from before, so the inherited exp0019 weight positions need no
+repositioning), RoboTwin moves to `[7:21]`/`[8:22]` (`action_offset=7`,
+`state_offset=8`), and K grows from 14 to **21 (action) / 22 (proprio)** = LIBERO's
+natural dim + RoboTwin's natural dim. Implemented via
+`ConcatLeftAlign.action_offset`/`state_offset` (was always implicitly 0) in
+`src/fastwam/datasets/lerobot/transforms/action_state_merger.py`. This is
+mathematically equivalent to fully separate per-embodiment weight matrices: for a
+shared `Linear`, a weight column/row's gradient is exactly zero whenever that
+embodiment's corresponding input/output slice is exactly zero, which now holds for
+every column outside an embodiment's own offset range (proven in
+`research/tools/test_action_state_merger_offset.py`,
+`test_shared_linear_gradient_isolation_across_embodiments`). No changes needed to
+`action_dit.py`/`fastwam.py` model code, checkpoint save/load, the dataset pipeline,
+or the trainer — only the padding config and a freshly re-expanded checkpoint (must
+re-run `expand_checkpoint_for_multiembodiment.py` against the **original,
+unexpanded** exp0019 checkpoint with `--new-action-dim 21 --new-proprio-dim 22`, not
+against the old K=14 expansion — the tool only ever appends new columns at the end,
+so widening the K=14 expansion further would leave RoboTwin's channels stuck at
+`[0:14]` instead of moving them to `[7:21]`).
 - time-step validity mask interaction: not yet designed — needs to compose with the existing temporal `action_is_pad` [B,T] mask already used by the loss.
 - loss reduction/averaging rule: not yet implemented — planned: masked mean over only valid (channel, timestep) pairs, not a plain `.mean(dim=2)` over all channels.
 - dataset-specific normalization before padding/after decoding: apply each dataset's own normalization (LIBERO min/max, RoboTwin z-score) in its natural (un-padded) dimensionality first, then pad; decode by cropping to the natural dimension before un-normalizing at inference.

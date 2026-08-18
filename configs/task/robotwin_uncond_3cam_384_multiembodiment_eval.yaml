@@ -1,10 +1,13 @@
 # @package _global_
 #
-# Evaluation-only task config for scoring an exp0001-family (shared padded K=14
-# multi-embodiment) checkpoint on RoboTwin. Uses the K=14-padded (no-op for RoboTwin,
-# already natural K=14), embodiment-conditioned RoboTwin data/processor config as
-# training (configs/data/robotwin_multiembodiment.yaml) and the matching model config
-# (configs/model/fastwam_multiembodiment.yaml).
+# Evaluation-only task config for scoring a shared-padded-multi-embodiment
+# checkpoint on RoboTwin. Uses the padded, embodiment-conditioned RoboTwin
+# data/processor config as training (configs/data/robotwin_multiembodiment.yaml) and
+# the matching model config (configs/model/fastwam_multiembodiment.yaml). Current
+# shared dims: action K=21, state K=22, RoboTwin's 14 natural channels at offset 7/8
+# (see PROGRESS_0003); exp0001/exp0002 used K=14 with RoboTwin filling the whole
+# range from offset 0 (which is the diagnosed cause of those candidates' LIBERO
+# regression — RoboTwin's forward values overlapped LIBERO's valid columns).
 #
 # Not a training config (batch_size/scheduler fields below are placeholders required
 # by shared Hydra schema, unused by experiments/robotwin/run_robotwin_manager.py).
