@@ -1,7 +1,7 @@
 # PROGRESS_0003 — disjoint per-embodiment column offset
 
 - **Experiment ID:** 0003
-- **Status:** `PLANNED`
+- **Status:** `REJECT`
 - **Created:** 2026-08-18
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0000_parent_baseline (exp0019); diagnosis inherited from 0001 and 0002
@@ -12,7 +12,16 @@
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (1000/1000 steps, no NaN/anomalies). LIBERO-Spatial
+candidate_screen: **50.00% (15/30)** — better than exp0002 (16.67%) but *worse* than
+exp0001 (73.33%), still far below the 96.67% baseline and the 90% floor. This
+contradicts the simple version of the disjoint-offset-fixes-it hypothesis (see
+Section 7 for the full analysis). **Decision: `REJECT`** — LIBERO retention floor not
+met, and the candidate underperforms its own predecessor despite implementing a
+mathematically-verified interference fix, so the mechanism understanding needs
+revision before the next candidate. RoboTwin was not evaluated (per project
+convention: no point spending RoboTwin compute on a candidate that already fails the
+LIBERO retention gate). Next: `$investigate-fastwam-problem`.
 
 ## 2. Research state before experiment
 
@@ -287,8 +296,103 @@ training processes remained and all 4 GPUs returned to 0MiB/0% usage.
     model.redirect_common_files=false
   ```
 - reference: exp0019 canonical 97.00%; setup sentinel 96.67% (29/30); exp0001 (same panel) 73.33% (22/30); exp0002 (same panel) 16.67% (5/30)
-- result: launched, awaiting completion — log at `checkpoints/exp0003_libero_screen.log`
+- **result: 50.00% (15/30) — better than exp0002 (16.67%), but WORSE than exp0001 (73.33%), and still far below the 96.67% baseline and the 90% promotion floor.**
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_052405/`
+- runtime: ~43 minutes
+- validity checks: 10/10 task result files present, correct checkpoint path/step in `summary.json`, correct (freshly recomputed, distinct-filename) LIBERO stats used, `model.redirect_common_files=false` applied.
+- per-task breakdown:
+
+  | Task | exp0019 setup sentinel | exp0001 (K=14, overlap) | exp0002 (frozen backbone) | exp0003 (K=21, disjoint) |
+  |---|---:|---:|---:|---:|
+  | task0 "bowl between plate/ramekin" | 100% | 66.7% | 66.7% | **0%** |
+  | task1 "bowl next to ramekin" | 100% | 100% | 0% | 33.3% |
+  | task2 "bowl from table center" | 100% | 100% | 33.3% | 100% |
+  | task3 "bowl on cookie box" | 100% | 100% | 33.3% | 100% |
+  | task4 "bowl in top drawer" | 66.7% | 0% | 0% | 0% |
+  | task5 "bowl on ramekin" | 100% | 33.3% | 0% | **0%** |
+  | task6 "bowl next to cookie box" | 100% | 66.7% | 0% | 100% |
+  | task7 "bowl on stove" | 100% | 66.7% | 0% | **0%** |
+  | task8 "bowl next to plate" | 100% | 100% | 33.3% | 100% |
+  | task9 "bowl on wooden cabinet" | 100% | 100% | 0% | 66.7% |
+
+**This result is a genuine surprise and contradicts the simple version of the
+disjoint-offset hypothesis.** If shared-column overlap in `action_encoder`/`head`/
+`proprio_encoder` were the *sole* interference mechanism, disjoint offsets + the same
+full-fine-tune backbone treatment as exp0001 should produce retention **at least as
+good as exp0001's 73.33%** (strictly less projection-layer interference, same
+backbone plasticity). Instead it landed at 50.00%, a *regression* from exp0001.
+Notably the failure pattern is not a uniform shrinkage of exp0001's result: three
+tasks that were perfect in exp0001 (0,5,7 relative — actually 0 and 5 already had
+partial exp0001 failure, task7 was 66.7% in exp0001) dropped to 0% in exp0003, while
+three different tasks (2,3,6) that were imperfect or middling in exp0001 hit 100% in
+exp0003. This scattered, task-swapping pattern (rather than a uniform across-the-board
+decline) is more consistent with **run-to-run instability/variance** than with a
+single clean, monotonic causal mechanism — though a 23pp aggregate gap on a 30-trial
+panel is large enough that it is unlikely to be pure noise. See `research/progress/`
+investigation follow-up for the next diagnostic steps.
+
+decision enabled by this evidence: `DIAGNOSE` — the disjoint-offset fix's own
+correctness at the projection-layer level is not in question (proven directly by the
+gradient-isolation unit test); what this result shows is that projection-layer
+overlap is evidently **not the sole or dominant** interference mechanism, and/or that
+moving to an all-fresh-init RoboTwin projection (vs. exp0001's partial warm-start via
+reused-but-corrupted LIBERO weights) introduces a *different* source of instability
+that, within this fixed 1000-step budget, outweighs the benefit of removing
+projection overlap. Needs `$investigate-fastwam-problem` before choosing the next
+candidate — candidates to weigh: (a) run-to-run/seed variance (an unseeded,
+un-replicated 3-trial/task panel may simply have high variance — consider a repeat
+run or a larger trial count before concluding the fix is ineffective), (b) the shared
+transformer *backbone* (30-layer MoT/DiT blocks) as an under-addressed interference
+channel independent of the projection layers, (c) whether RoboTwin's cold-start
+(all-fresh, no warm-start) projection init is itself destabilizing early training in
+a way a warm-started init would not be.
 
 ## 7. Evaluation events
 
-None yet.
+(Content moved into Section 6's "Evaluation event — LIBERO-Spatial `candidate_screen`"
+subsection above, alongside the training timeline it directly follows.)
+
+## 8. Decision
+
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (not evaluated — LIBERO result alone already rejects it, and it underperforms the already-rejected exp0001, so there is no point spending RoboTwin compute on it)
+- **All five LIBERO >=90% canonical:** no (50.00% Spatial sentinel, far below floor, and worse than exp0001's already-rejected 73.33%)
+- **Reason:** the disjoint-offset fix is proven correct at the projection-layer level (gradient-isolation unit test) but did not translate into better real-training retention than exp0001 — it landed at 50.00%, between exp0001 (73.33%) and exp0002 (16.67%), meaning projection-layer column overlap is evidently not the sole or dominant interference mechanism. The specific per-task failure pattern (three tasks that were fine in exp0001 dropped to 0%, three different tasks that were weak in exp0001 hit 100%) looks more like a different, scattered failure mode than a uniform continuation/worsening of exp0001's pattern — consistent with either meaningful run-to-run variance on a small 3-trial/task panel, or a genuinely new instability source introduced by the all-fresh-init RoboTwin projection weights (vs. exp0001's partial warm-start from reused, if corrupted, LIBERO weights).
+- **Checkpoint/branch to preserve:** none; not promoted. The disjoint-offset mechanism itself (`ConcatLeftAlign.action_offset`/`state_offset`) remains valid, tested infrastructure — kept in the codebase as it may still be a useful *component* of a future candidate (e.g. combined with an explicit retention mechanism), even though it alone was insufficient this run.
+- **Next main-line parent:** unchanged — exp0019 (now with both a K=14-overlap and a K=21-disjoint expansion path available; neither has been promoted).
+
+## 9. What this changes for the next experiment
+
+Both of the two most-specific mechanistic hypotheses tested so far (backbone
+plasticity in exp0002; projection-layer column overlap in exp0003) failed to fully
+explain or fix the regression on their own:
+
+- exp0002 showed backbone plasticity is *helping* retention, not hurting it (freezing made things worse) — ruling out "unmasked video loss corrupting the backbone" as the dominant story.
+- exp0003 showed projection-layer disjointness alone, with the same trainable backbone as exp0001, does *not* reliably improve on exp0001 — ruling out "shared projection columns are the whole story," at least not without also controlling for training-run variance or backbone-level interference.
+
+This points toward the interference (or a substantial part of it) genuinely living in
+the **shared transformer backbone** (30-layer action DiT + MoT mixture-of-experts),
+which no candidate so far has *isolated* from projection-layer effects — exp0001 and
+exp0003 both trained the full backbone; exp0002 froze the *entire* backbone at once,
+conflating "no backbone interference" with "no backbone plasticity to compensate for
+projection issues." A cleaner diagnostic would separate these:
+
+1. **Backbone-frozen + disjoint-offset projections** (exp0002's freezing, exp0003's projection fix, combined) — isolates whether disjoint projections alone (without backbone plasticity muddying the comparison) hold up LIBERO retention when the backbone truly cannot drift.
+2. **Explicit retention/regularization mechanism** (e.g. an LIBERO-anchoring/distillation loss, or EWC-style weight-importance penalty on backbone parameters) layered on top of the disjoint-offset projections, directly targeting whatever backbone drift remains.
+3. **Repeat exp0003's exact configuration with a controlled/fixed random seed** (and/or a larger trial count, e.g. 5 trials/task instead of 3) to establish how much of the 73.33%->50.00% gap is genuine effect vs. run-to-run variance before spending more compute chasing a possibly-noisy signal.
+
+Recommend `$investigate-fastwam-problem` to weigh these before committing to the next
+candidate's design, rather than picking blindly — in particular to determine whether
+per-layer gradient-norm/update-magnitude diagnostics (comparing exp0001 vs exp0003
+mid-training) can directly reveal whether backbone drift for LIBERO-relevant
+representations was actually larger in exp0003 than exp0001, which would be positive
+evidence for the backbone-interference hypothesis over the variance hypothesis.
+
+## 10. Artifacts
+
+- training log: `checkpoints/exp0003_train.log`
+- smoke test log: `checkpoints/exp0003_smoke_train.log`
+- LIBERO screen log: `checkpoints/exp0003_libero_screen.log`
+- LIBERO screen raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_052405/`
+- checkpoint (local, not promoted): `runs/reweighted_multiembodiment/exp0003_disjoint_offset_v1/checkpoints/weights/step_001000.pt`
+- expanded parent checkpoint used: `checkpoints/exp0019_expanded_k21_disjoint/step_005000.pt`
