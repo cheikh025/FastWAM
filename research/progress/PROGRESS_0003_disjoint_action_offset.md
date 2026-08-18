@@ -8,7 +8,7 @@
 - **Parent checkpoint:** `cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt` (the **original, unexpanded** checkpoint — not `exp0019_expanded_k14`, see Section 3)
 - **Selected candidate checkpoint:** none yet
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
-- **Git commit:** pending (will record after this report + code/config changes are committed together, before training launch)
+- **Git commit:** `8e74590` (implementation commit; checkpoint expansion + training launch follow)
 
 ## 1. Result at a glance
 
@@ -166,7 +166,7 @@ require. This is confirmed directly (not just argued) in
 
 ## 4. Exact code and configuration state
 
-- Git commit: pending (recorded after committing this report + code/config changes together, before training launch)
+- Git commit: `8e74590`
 - Git branch: `autoresearch/robotwin-multiembodiment-v1`
 - parent code commit: `e0ac005` (exp0002 REJECT commit)
 - working tree clean/dirty before launch: will be clean at commit time
