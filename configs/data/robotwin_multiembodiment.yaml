@@ -63,7 +63,7 @@ train:
     # Qwen-VLA-style textual embodiment conditioning — RoboTwin's embodiment is the
     # bimanual ALOHA-AgileX robot (confirmed during setup via
     # third_party/RoboTwin/task_config/_embodiment_config.yaml, "aloha-agilex").
-    embodiment_description: "The robot is a bimanual ALOHA-AgileX manipulator with two arms, each with a parallel-jaw gripper."
+    # embodiment_description intentionally omitted -- see PROGRESS_0011.
 
     train_transforms:
       - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor

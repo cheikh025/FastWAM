@@ -36,6 +36,9 @@ train:
   camera_key: null
   val_set_proportion: 0.0
   is_training_set: true
+  # See PROGRESS_0011: use the release checkpoint's own paired stats rather than
+  # auto-computing fresh stats from this reduced 4-suite mixture.
+  pretrained_norm_stats: ./checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
   skip_padding_as_possible: false
   concat_multi_camera: "horizontal"
   processor:
@@ -68,7 +71,7 @@ train:
     # sole embodiment-conditioning mechanism, prepended to the instruction via
     # FastWAMProcessor.augment_instruction(). LIBERO's embodiment is the Franka Panda
     # single-arm manipulator (standard across the LIBERO benchmark).
-    embodiment_description: "The robot is a Franka Panda single-arm manipulator with a parallel-jaw gripper."
+    # embodiment_description intentionally omitted -- see PROGRESS_0011.
 
     train_transforms:
       - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor

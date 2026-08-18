@@ -50,6 +50,12 @@ train:
         camera_key: null
         val_set_proportion: 0.0
         is_training_set: true
+        # Use the release checkpoint's own paired stats rather than auto-computing fresh
+        # stats from this multi-embodiment mixture's smaller/differently-composed LIBERO
+        # subset -- see PROGRESS_0011 for why a mismatch here silently corrupts action
+        # normalization (the checkpoint's action head is calibrated against these exact
+        # min/max ranges, not whatever ranges this run's own data happens to produce).
+        pretrained_norm_stats: ./checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
         skip_padding_as_possible: false
         concat_multi_camera: "horizontal"
         processor:
@@ -76,7 +82,11 @@ train:
             state_target_dim: 22
             action_offset: 0
             state_offset: 0
-          embodiment_description: "The robot is a Franka Panda single-arm manipulator with a parallel-jaw gripper."
+          # embodiment_description intentionally omitted -- see PROGRESS_0011: this was a
+          # self-introduced conditioning mechanism never part of FastWAM's own canonical
+          # LIBERO/RoboTwin pipeline, silently baked into every candidate since exp0001.
+          # If ever tested again, it must be its own explicit, isolated candidate compared
+          # against this clean baseline.
           train_transforms:
             - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor
             - _target_: torchvision.transforms.Resize
@@ -155,7 +165,7 @@ train:
             state_target_dim: 22
             action_offset: 7
             state_offset: 8
-          embodiment_description: "The robot is a bimanual ALOHA-AgileX manipulator with two arms, each with a parallel-jaw gripper."
+          # embodiment_description intentionally omitted -- see note in the libero block above.
           train_transforms:
             - _target_: fastwam.datasets.lerobot.transforms.image.ToTensor
             - _target_: torchvision.transforms.Resize
