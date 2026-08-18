@@ -189,7 +189,37 @@ NaN/Inf, `step: 1000`. Training log: `checkpoints/exp0005_train.log`.
     model.redirect_common_files=false
   ```
 - reference: exp0019 canonical 97.00%; setup sentinel 96.67%; exp0001 73.33%; exp0002 16.67%; exp0003 50.00%; exp0004 63.33%
-- result: launched, awaiting completion — log at `checkpoints/exp0005_libero_screen.log`
+- **result: 63.33% (19/30)** — lands *exactly* at exp0004's aggregate result, above exp0003's 50.00%, still below exp0001's 73.33% and the 90% floor.
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_081137/`
+- runtime: ~33 minutes
+- validity checks: 10/10 task result files present, correct checkpoint path/step, correct per-embodiment stats file.
+- per-task breakdown:
+
+  | Task | baseline | exp0003 (train+disjoint) | exp0004 (freeze+disjoint) | exp0005 (backbone_lr=3e-6) |
+  |---|---:|---:|---:|---:|
+  | task0 "bowl between plate/ramekin" | 100% | 0% | 66.7% | 33.3% |
+  | task1 "bowl next to ramekin" | 100% | 33.3% | 0% | 33.3% |
+  | task2 "bowl from table center" | 100% | 100% | 100% | 100% |
+  | task3 "bowl on cookie box" | 100% | 100% | 66.7% | 100% |
+  | task4 "bowl in top drawer" | 66.7% | 0% | 0% | 0% |
+  | task5 "bowl on ramekin" | 100% | 0% | 66.7% | 66.7% |
+  | task6 "bowl next to cookie box" | 100% | 100% | 100% | 100% |
+  | task7 "bowl on stove" | 100% | 0% | 100% | 100% |
+  | task8 "bowl next to plate" | 100% | 100% | 100% | 100% |
+  | task9 "bowl on wooden cabinet" | 100% | 66.7% | 33.3% | 0% |
+  | **Overall** | **96.7%** | **50.0%** | **63.3%** | **63.3%** |
+
+  Despite matching exp0004's *aggregate* exactly, the *per-task* allocation
+  differs meaningfully (task0 66.7%->33.3%, task1 0%->33.3%, task3 66.7%->100%,
+  task9 33.3%->0%) — the same overall retention level was reached via a different
+  specific mix of successes/failures, consistent with substantial per-task noise at
+  n=3 trials rather than exp0005 being a literal no-op relative to exp0004. task4
+  remains 0% across every multi-embodiment candidate to date (baseline's own
+  weakest task too).
+- decision enabled by this evidence: this alone does not distinguish exp0005 from
+  exp0004 on LIBERO retention — the RoboTwin evidence (below) is the more
+  informative signal for whether partial backbone plasticity was worth trading
+  for.
 
 ### Known minor imprecision (not a bug, documented for interpretation)
 
