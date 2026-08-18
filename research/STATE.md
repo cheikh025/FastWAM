@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — exp0008 rejected (ratio hypothesis refuted, both axes regressed), launching exp0009 (LIBERO-only continued-training control)`
+Status: `RESEARCH_LOOP_ACTIVE — exp0009 training (LIBERO-only continued-training control, no RoboTwin in the mixture at all)`
 
 ## Inherited parent reference
 
