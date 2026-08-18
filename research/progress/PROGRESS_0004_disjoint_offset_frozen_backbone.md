@@ -153,6 +153,33 @@ directory deleted after verification; log at `checkpoints/exp0004_smoke_train.lo
 - disk safety: background pruner (`checkpoints/prune_checkpoints_exp0004.log`), `KEEP=1`, 15s polling, 45GB free at launch
 - monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies. Final: `loss=0.9458
+loss_action=0.7720 loss_video=0.1738` (lr decayed to `3.00e-07`). Notably
+`loss_action` at completion (0.7720) is substantially higher than exp0003's
+(0.1009, trainable backbone) — consistent with a frozen backbone limiting how well
+the model can fit either embodiment's action prediction through the (unchanged)
+shared hidden representations, matching exp0002's analogous pattern (its final loss
+was also elevated relative to exp0001). Checkpoint `step_001000.pt`
+(12,042,248,481 bytes) verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero
+NaN/Inf, `step: 1000`. Training log: `checkpoints/exp0004_train.log`.
+
+### Evaluation event — LIBERO-Spatial `candidate_screen`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0004, step 1000 (full budget)
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0004_disjoint_offset_frozen_backbone_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0004_disjoint_offset_frozen_backbone_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=2 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: exp0019 canonical 97.00%; setup sentinel 96.67%; exp0001 73.33%; exp0002 16.67%; exp0003 50.00%
+- result: launched, awaiting completion — log at `checkpoints/exp0004_libero_screen.log`
+
 ## 7. Evaluation events
 
 None yet.
