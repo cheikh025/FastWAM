@@ -78,6 +78,8 @@ safely re-downloadable (durably backed up on `cheikh025/ASR` / `yuanty/fastwam`
 respectively; exact re-download commands are in `research/RUNBOOK.md`). (3) Deleted
 disposable `runs/_smoke_test/` artifacts after extracting their log evidence.
 
+**Operational addendum from exp0001's actual training run**: even with `save_full_state=false`, weights-only checkpoints (~12GB each at K=14) still exhaust the ~25-58GB of remaining headroom within 2-4 saves at `save_every=100`. Disk hit 100% (5.5GB free) again mid-run before this was caught by manual inspection (not by the log-tailing Monitor — rich's console line-wrapping means a literal substring like `[ckpt]` doesn't reliably appear on a single physical output line for `grep --line-buffered` to match, so checkpoint-save events were mostly silent to the monitor). **Fix**: run a simple background pruner (`while ps -p <pid>; do sleep 60; ls -1t weights/step_*.pt | tail -n +3 | xargs rm -f; done`) alongside any real multi-checkpoint training run on this hardware, keeping only the N most recent weights files, rather than relying on manual or log-monitor-triggered pruning.
+
 **For future candidates using RoboTwin**: budget disk carefully — the 900GB text
 cache is a fixed, unavoidable cost once computed (do not delete it casually, it's
 expensive multi-GPU-hours to regenerate), so essentially all remaining volume space

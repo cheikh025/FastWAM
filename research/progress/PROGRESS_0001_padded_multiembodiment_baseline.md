@@ -1,12 +1,12 @@
 # PROGRESS_0001 — padded_multiembodiment_baseline
 
 - **Experiment ID:** 0001_padded_multiembodiment_baseline
-- **Status:** `RUNNING`
+- **Status:** `EVALUATING`
 - **Created:** 2026-08-17
-- **Updated:** 2026-08-17
+- **Updated:** 2026-08-18
 - **Parent experiment:** 0000_parent_baseline
 - **Parent checkpoint:** `cheikh025/ASR:promoted/0019_spatial_weak_task_oversampling/step_005000.pt` (exp0019)
-- **Selected candidate checkpoint:** TBD — implementation complete and unit-tested; text-embedding precompute in progress; training not yet launched
+- **Selected candidate checkpoint:** `runs/reweighted_multiembodiment/exp0001_padded_baseline_v2/checkpoints/weights/step_001000.pt` (1000 real training steps completed cleanly, verified loadable, K=14 shapes, zero NaN/Inf) — not yet evaluated on LIBERO/RoboTwin
 - **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
 - **Git commit:** TBD (recorded once implementation is committed)
 
@@ -153,7 +153,53 @@ Not applicable to change — identical to `PROGRESS_0000_PARENT_BASELINE.md` Sec
 
 ## 6. Training execution and control timeline
 
-TBD.
+- exact launch command:
+  ```bash
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_3e-5 \
+    resume=/workspace/FastWAM/checkpoints/exp0019_expanded_k14/step_005000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0001_padded_baseline \
+    save_every=200 \
+    wandb.name=exp0001_padded_multiembodiment_baseline
+  ```
+  (`save_every` overridden from the task config's default 100 to 200 at launch — reduces checkpoint count from 10 to 5 across the 1000-step budget, given the tight disk headroom described in `research/NOTES.md` "Disk crisis"; older intermediate checkpoints will be actively pruned, keeping the 2-3 most recent, as the run progresses.)
+- start time: 2026-08-18 00:30:30 UTC
+- number of GPUs/world size: 4 (`scripts/accelerate_configs/accelerate_zero1_ds.yaml`, DeepSpeed ZeRO-1)
+- system/dependency snapshot: `research/progress/system_0001_padded_multiembodiment_baseline.json`
+- training log: `checkpoints/exp0001_train.log`
+- monitoring: a background `Monitor` watches for step milestones (every 10th logged step), checkpoint events, and failure signatures (errors/NaN/OOM/disk-write-failure) without polling the full log.
+
+- end time: 2026-08-18 01:38:18 UTC
+- wall-clock runtime: ~68 minutes total across two launch attempts (see "Training anomalies" below); the successful run (v2) alone: 00:45:28 -> 01:38:18 = ~53 minutes
+- exit code/status: clean exit, no error/traceback in the final run's log
+- steps completed: 1000/1000 (full initial budget)
+- throughput: ~0.34 step/s, ~1.36 samples/s (4 GPUs, batch_size=1, grad_accum=4 -> effective batch 16)
+- peak GPU memory: not separately profiled this run; comparable to setup's training smoke test (~60-65GB/GPU observed via `nvidia-smi` during the run)
+- important losses/diagnostics: loss decreased from an initial ~1.0-1.2 range (steps 1-100) to a final `loss=0.2403` (`loss_action=0.0983`, `loss_video=0.1421`) at step 1000, with the expected cosine-schedule LR decay to `lr=3.00e-07`. A single reproducible loss spike (~5.0) occurred at step 5 in every smoke-test attempt (same seed/data order) but did not recur or destabilize training over the full 1000-step run — consistent with an individual hard early batch, not instability.
+- training log: `checkpoints/exp0001_train_v2.log` (final successful attempt)
+- system snapshot: `research/progress/system_0001_padded_multiembodiment_baseline.json`
+
+### Intermediate checkpoints and progress decisions
+
+| Checkpoint / step | Runtime so far | Eval purpose | RoboTwin evidence | LIBERO retention evidence | Decision | Updated training plan |
+|---|---:|---|---|---|---|---|
+| step_001000 (final) | ~53 min | none yet | none yet | none yet | `RECHECK_PROGRESS` (proceed to `$evaluate-fastwam-multiembodiment` candidate_screen) | — |
+
+No mid-run progress-check evaluation was performed (the in-loop qualitative eval was disabled — see "Training anomalies" below — and no external LIBERO/RoboTwin evaluation was launched mid-training); the first evidence-gathering step is the post-training candidate screen.
+
+### Why training ended
+
+Planned completion — reached `max_steps=1000` cleanly on the second launch attempt (v2), no early-stop trigger.
+
+### Training anomalies
+
+Three real issues were hit and fixed across three total launch attempts (documented in full in "First real end-to-end training smoke test" above and `research/NOTES.md`), before the real 1000-step run itself proceeded cleanly:
+
+1. **Double-instantiate bug** (`build_multi_embodiment_dataset` called `instantiate()` on an already-Hydra-instantiated dataset object) — caught during the 8-step smoke test, fixed before the real run.
+2. **Disk-full crash during full-state checkpoint save** — caught during the 8-step smoke test; fixed via `save_full_state=false`.
+3. **In-loop qualitative-eval crash** (`Trainer.evaluate()` assumes `val_dataset.lerobot_dataset`, incompatible with the multi-embodiment `ConcatDataset`) — this one was NOT caught by the 8-step smoke test (its `eval_every=999999` override happened to avoid triggering the eval path in that short run) and instead crashed the **real training run's first launch attempt** at step 200 with **zero checkpoint saved**, losing ~14 minutes of real compute. Fixed by disabling in-loop eval (`eval_every=999999` baked into the task config); relaunched as run "v2", which completed successfully.
+4. **Recurring disk pressure during the real run**: even with `save_full_state=false`, weights-only checkpoints (~12GB each) at `save_every=100` exhausted available headroom within 2-4 saves (down to 5.5GB free at one point, mid-run). Fixed live by (a) manually pruning older checkpoints once, and (b) launching a simple automated background pruner (keeps the 2 most recent weights files, checks every 60s, self-terminates when the training process exits) for the remainder of the run. See "Disk crisis" addendum in `research/NOTES.md`.
+
+None of these anomalies indicate a problem with the padded multi-embodiment *training mechanism* itself (loss masking, checkpoint expansion, embodiment conditioning) — all were infrastructure/plumbing gaps in code paths adjacent to it (dataset instantiation, in-loop eval, disk management), now fixed and documented for reuse by later candidates.
 
 ## 7. Evaluation events
 
