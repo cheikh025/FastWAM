@@ -148,6 +148,23 @@ NaN/Inf. Smoke-test run directory deleted after verification; log at
 - disk safety: background pruner (`checkpoints/prune_checkpoints_exp0009.log`), `KEEP=1`, 15s polling, 45GB free at launch
 - monitoring: persistent `Monitor` on the training log
 
+### Training completion
+
+All 1000 steps completed cleanly, no NaN/Inf, no anomalies. Final: `loss=0.0878
+loss_action=0.0251 loss_video=0.0627` — notably much lower than every prior
+candidate (even exp0008's LIBERO-heavy 3:1 mix, which still had some RoboTwin batches
+pulling the average up), consistent with pure LIBERO fine-tuning on data the model
+already handles well. Runtime ~46 minutes (15:31 -> 16:17), actually comparable to
+rather than faster than mixed-embodiment runs (LIBERO's per-sample cost isn't
+necessarily lower, just its total dataset size). Checkpoint `step_001000.pt`
+verified: shapes `(1024,21)`/`(21,1024)`/`(4096,22)`, zero NaN/Inf, `step: 1000`.
+
+### Evaluation launch
+
+LIBERO-Spatial screen launched on GPUs 0-1, using `dataset_stats.json` (the plain
+default filename, since this is a single-embodiment run with no
+collision/`stats_filename` override needed).
+
 ## 7. Evaluation events
 
 None yet.
