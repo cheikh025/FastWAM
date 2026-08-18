@@ -163,6 +163,27 @@ deleted after verification; log at `checkpoints/exp0006_smoke_train.log`.
 - monitoring: persistent `Monitor` on the training log watching for checkpoint-save events and failure signatures
 - planned mid-run check: LIBERO-Spatial sentinel + RoboTwin 2-task progress check at step ~2000
 
+### Mid-run check-in (step ~1400/4000)
+
+Training healthy: losses well-behaved (`loss` 0.30-1.01, `loss_action` 0.14-0.88, no
+NaN/Inf), `speed=0.44 step/s` (matches exp0004's fastest-among-candidates pace,
+frozen backbone = fewer gradients to compute), `eta≈01:38:00` remaining as of step
+1400. A `step_001000.pt` checkpoint was available (the `save_every=500` schedule's
+first surviving save under the `KEEP=1` pruner).
+
+**GPU memory note**: this frozen-backbone recipe uses only ~16-17GB/80GB per GPU
+during training (vs. ~61-70GB for exp0001/exp0003/exp0005's full-trainable-backbone
+runs) — DeepSpeed doesn't need ZeRO optimizer-state memory for the ~5B frozen
+backbone parameters, only for the 6 small trainable projection tensors. This left
+ample headroom (~60GB+ free per GPU) to run a mid-run LIBERO-Spatial screen
+concurrently with training, unlike exp0003's situation (where the trainable-backbone
+run left only ~16-20GB free per GPU, too tight to risk a parallel eval). Launched a
+LIBERO-Spatial candidate_screen on the step-1000 checkpoint with
+`MULTIRUN.max_tasks_per_gpu=1` (more conservative than the usual `2`, given training
+is still concurrently active) rather than waiting for training to finish. Training
+confirmed still healthy immediately after the eval job started (step 1400, same
+speed/loss pattern, no slowdown or memory pressure observed).
+
 ## 7. Evaluation events
 
 None yet.
