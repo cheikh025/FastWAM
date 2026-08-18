@@ -1,7 +1,7 @@
 # PROGRESS_0001 — padded_multiembodiment_baseline
 
 - **Experiment ID:** 0001_padded_multiembodiment_baseline
-- **Status:** `EVALUATING`
+- **Status:** `REJECT`
 - **Created:** 2026-08-17
 - **Updated:** 2026-08-18
 - **Parent experiment:** 0000_parent_baseline
@@ -265,15 +265,20 @@ None of these anomalies indicate a problem with the padded multi-embodiment *tra
 
 ## 8. Comparison and interpretation
 
-TBD.
+This candidate established that the shared padded multi-embodiment interface (checkpoint expansion, per-channel masked loss, embodiment-conditioned prompts, interleaved batch mixing) is mechanically correct — every piece is independently unit-tested and the training/eval pipeline runs end-to-end without numerical errors. But the *training recipe* chosen for this initial baseline (full fine-tune, no freezing, ~1:1 LIBERO:RoboTwin interleaving, 1000 steps) produced a real LIBERO-Spatial regression (96.67%->73.33%) with zero measured RoboTwin success — cost without benefit. `$investigate-fastwam-problem` traced the likely cause to the video-denoising loss not being per-embodiment-masked (unlike the correctly-masked action loss), so RoboTwin's very different visual domain directly trains the shared backbone LIBERO's video generation depends on, compounded by training with nothing frozen.
 
 ## 9. Decision
 
-TBD.
+- **Decision:** `REJECT`
+- **Canonical RoboTwin evidence available:** no (progress-check only, 2 of 50 tasks)
+- **All five LIBERO >=90% canonical:** no (candidate-screen evidence only, but LIBERO-Spatial's 73.33% sentinel is far below the 90% floor with high confidence — not close enough to warrant spending canonical-evaluation compute to confirm)
+- **Reason:** clear, statistically unambiguous LIBERO-Spatial regression (a ~23pp drop, ~7-8 standard deviations beyond plausible trial-count noise) combined with zero measured RoboTwin capability. Does not meet the bar for further investment as-is. The mechanism-level implementation (padding/masking/expansion/conditioning) is retained — only the *training recipe* is rejected — informing exp0002 directly rather than being a dead end.
+- **Checkpoint/branch to preserve:** none of exp0001's checkpoints are being promoted or durably preserved (not uploaded to `cheikh025/ASR`); the diagnostic value (per-task LIBERO breakdown, RoboTwin 0% readings) is fully captured in this report and does not require the raw 12GB checkpoint to remain locally. Local checkpoint files removed to free disk for exp0002 (see `research/NOTES.md` "Disk crisis" — RoboTwin's 900GB text-embedding cache leaves very little headroom for multiple candidates' checkpoints simultaneously).
+- **Next main-line parent:** unchanged — exp0019 (expanded to K=14, `checkpoints/exp0019_expanded_k14/step_005000.pt`) remains the parent for the next candidate; exp0001 never became a main-line checkpoint.
 
 ## 10. What this changes for the next experiment
 
-TBD.
+exp0002 (frozen-backbone warm-up) directly tests the leading hypothesis: freeze the shared MoT backbone, train only the newly-expanded `action_encoder`/`head`/`proprio_encoder`, same 1000-step budget and data mixture otherwise, for a clean comparison. If LIBERO retention holds substantially better, that confirms the video-loss/shared-backbone interference hypothesis and points toward a staged unfreeze schedule as the production recipe. If LIBERO retention *still* regresses even with the backbone frozen, the embodiment-conditioning prompt change (100% of LIBERO's training instructions gained a new prefix) becomes the next leading hypothesis to isolate.
 
 ## 11. Artifacts
 
