@@ -12,7 +12,18 @@
 
 ## 1. Result at a glance
 
-Not yet run. This report records the candidate design before training launch.
+Training completed cleanly (1000/1000 steps, no NaN/anomalies). LIBERO-Spatial
+candidate_screen: **63.33% (19/30)** — the best multi-embodiment retention result
+after exp0001 (73.33%), and a large jump over exp0002 (16.67%, the other
+frozen-backbone candidate). This fills the missing cell of the 2x2 (backbone
+trainable/frozen x projections overlap/disjoint) matrix and reveals two clean,
+*opposite-direction* effects: freezing the backbone hurts when projections overlap
+(73.33%->16.67%) but helps when projections are disjoint (50.00%->63.33%) — evidence
+that disjoint offsets are a real, substantial fix, and that backbone-level drift is a
+*second, independent* interference channel. Still below exp0001 and far below the
+90% floor. **Decision: `REJECT`** (floor not met) but this is the strongest
+multi-embodiment evidence base so far for designing exp0005. See Section 7 for the
+full matrix analysis and Section 9 for next-candidate reasoning.
 
 ## 2. Research state before experiment
 
@@ -178,8 +189,78 @@ NaN/Inf, `step: 1000`. Training log: `checkpoints/exp0004_train.log`.
     model.redirect_common_files=false
   ```
 - reference: exp0019 canonical 97.00%; setup sentinel 96.67%; exp0001 73.33%; exp0002 16.67%; exp0003 50.00%
-- result: launched, awaiting completion — log at `checkpoints/exp0004_libero_screen.log`
+- **result: 63.33% (19/30)** — far above exp0002's 16.67%, above exp0003's 50.00%, but still below exp0001's 73.33% and far below the 90% floor.
+- raw results path: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_063043/`
+- runtime: ~33 minutes
+- validity checks: 10/10 task result files present, correct checkpoint path/step, correct per-embodiment stats file.
+- per-task breakdown:
+
+  | Task | baseline | exp0001 (train+overlap) | exp0002 (freeze+overlap) | exp0003 (train+disjoint) | exp0004 (freeze+disjoint) |
+  |---|---:|---:|---:|---:|---:|
+  | task0 "bowl between plate/ramekin" | 100% | 66.7% | 66.7% | 0% | 66.7% |
+  | task1 "bowl next to ramekin" | 100% | 100% | 0% | 33.3% | **0%** |
+  | task2 "bowl from table center" | 100% | 100% | 33.3% | 100% | 100% |
+  | task3 "bowl on cookie box" | 100% | 100% | 33.3% | 100% | 66.7% |
+  | task4 "bowl in top drawer" | 66.7% | 0% | 0% | 0% | **0%** |
+  | task5 "bowl on ramekin" | 100% | 33.3% | 0% | 0% | 66.7% |
+  | task6 "bowl next to cookie box" | 100% | 66.7% | 0% | 100% | 100% |
+  | task7 "bowl on stove" | 100% | 66.7% | 0% | 0% | 100% |
+  | task8 "bowl next to plate" | 100% | 100% | 33.3% | 100% | 100% |
+  | task9 "bowl on wooden cabinet" | 100% | 100% | 0% | 66.7% | 33.3% |
+  | **Overall** | **96.7%** | **73.3%** | **16.7%** | **50.0%** | **63.3%** |
+
+**The full 2x2 matrix**:
+
+  |  | overlapping projections (K=14) | disjoint projections (K=21/22) |
+  |---|---:|---:|
+  | **trainable backbone** | exp0001: 73.33% | exp0003: 50.00% |
+  | **frozen backbone** | exp0002: 16.67% | exp0004: **63.33%** |
+
+This is a real, informative, and somewhat counter-intuitive finding. Two clean,
+opposite-direction effects appear depending on the projection design:
+
+- **With overlapping projections**, freezing the backbone *hurts* retention (73.33% -> 16.67%): with no backbone plasticity, there is nothing to absorb/compensate for RoboTwin's gradient corrupting LIBERO's shared projection weights.
+- **With disjoint projections**, freezing the backbone *helps* retention (50.00% -> 63.33%): once projection corruption is eliminated, the backbone itself becomes the dominant remaining interference channel — RoboTwin's gradient still drifts the fully-shared 30-layer MoT/DiT backbone away from LIBERO-favorable representations when trainable, and freezing it removes that channel too.
+
+Task4 ("bowl in top drawer of wooden cabinet") is 0% in **every** multi-embodiment
+candidate so far, including the baseline's own weakest task (66.7%) — a
+persistently hard task independent of any of these design choices, not new evidence
+about the candidate itself. Task1 also dropped to 0% here despite being 100% for
+both the baseline and exp0001, and 33.3% for exp0003 — consistent with continued
+non-trivial noise/instability at the individual-task level on this small panel, even
+in the best-so-far frozen+disjoint configuration.
+
+decision enabled by this evidence: `DIAGNOSE`, combined with the matrix pattern above
+— disjoint offsets are now confirmed as a real, substantial fix (17%->63% in the
+frozen-backbone regime, isolating the effect cleanly), but backbone-level drift is a
+second, independent interference channel that a full freeze eliminates at the cost of
+whatever adaptation benefit backbone plasticity might otherwise provide (unclear
+whether that benefit is for LIBERO retention, RoboTwin skill acquisition, or both —
+exp0001, the only candidate with a trainable backbone AND competitive retention,
+still has not been shown to produce any real RoboTwin capability either). Still no
+candidate exceeds exp0001's 73.33%, and none clear the 90% floor.
 
 ## 7. Evaluation events
 
-None yet.
+(LIBERO-Spatial candidate_screen recorded in Section 6 above.)
+
+### Event — RoboTwin `progress_check`
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0004, step 1000
+- decision this evaluation was meant to inform: whether a frozen backbone (with disjoint-offset projections) can support ANY RoboTwin capability, given exp0004 is the best-retention frozen-backbone candidate so far and no prior candidate has both non-collapsed LIBERO retention AND a RoboTwin measurement
+- exact task/difficulty coverage: 2 of 50 canonical tasks (`adjust_bottle`, `click_alarmclock`), `demo_clean` phase (matching exp0001's panel for direct comparison)
+- trials/episodes: 3 per task
+- exact command (per-task, pinned to separate GPUs):
+  ```bash
+  CUDA_VISIBLE_DEVICES=<0|1> python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0004_disjoint_offset_frozen_backbone_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0004_disjoint_offset_frozen_backbone_v1/robotwin_dataset_stats.json \
+    EVALUATION.task_name=<adjust_bottle|click_alarmclock> EVALUATION.eval_num_episodes=3 \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+  (First attempt, without `EVALUATION.dataset_stats_path`, crashed with
+  `FileNotFoundError` — a real, previously-masked infra gap, see
+  `research/NOTES.md` "RoboTwin eval gotcha — dataset_stats.json auto-discovery".)
+- reference: exp0001's same 2-task panel — 0.0% across every measurement
+- result: launched, awaiting completion
