@@ -1,0 +1,59 @@
+# @package _global_
+#
+# exp0004 (PROGRESS_0004_disjoint_offset_frozen_backbone): the missing cell in the
+# 2x2 (backbone trainable/frozen x projection overlap/disjoint) matrix built up by
+# exp0001-exp0003.
+#
+#   |                   | overlapping projections (K=14) | disjoint projections (K=21/22) |
+#   |-------------------|--------------------------------:|--------------------------------:|
+#   | trainable backbone | exp0001: 73.33%                | exp0003: 50.00%                |
+#   | frozen backbone    | exp0002: 16.67%                | exp0004: this candidate         |
+#
+# exp0002 showed backbone plasticity is net-helpful for retention (freezing made
+# things worse) but confounded that with still-overlapping projections. exp0003
+# isolated the projection fix (proven interference-free in isolation via a
+# gradient-isolation unit test) but confounded it with a full trainable backbone,
+# and the result (50.00%, worse than exp0001) shows projection-column overlap is not
+# the sole/dominant interference mechanism. Neither prior candidate cleanly separates
+# "projection overlap" from "backbone drift" as the dominant cause.
+#
+# This candidate combines exp0002's freezing (`trainable_modules:
+# expanded_projections_only` -- entire shared MoT/DiT backbone frozen, byte-identical
+# to exp0019 by construction) with exp0003's disjoint-offset projections (K=21/22,
+# LIBERO at offset 0, RoboTwin at offset 7/8) to test disjoint projections in
+# isolation from backbone-plasticity effects: if this clears well above exp0002's
+# 16.67% (toward exp0001's 73.33%), disjoint offsets genuinely help once isolated
+# from backbone drift. If it stays near exp0002's floor, backbone-level interference
+# is implicated as dominant regardless of projection design, pointing toward a
+# different retention strategy (distillation/EWC, LoRA-style adaptation, or a much
+# lower RoboTwin sampling ratio) rather than further projection-layer tweaks.
+#
+# Otherwise identical to configs/task/multiembodiment_libero_robotwin_disjoint_offset_3e-5.yaml
+# (exp0003's data/model wiring, batch/LR/schedule, save_full_state, eval disabled)
+# except `trainable_modules: expanded_projections_only`.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 1
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: expanded_projections_only
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
