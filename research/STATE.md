@@ -64,9 +64,11 @@ Canonical protocol confirmed during original setup (`research/RUNBOOK.md`): 50-t
 | LIBERO-Goal | 97.0% |
 | **LIBERO-Long** | **87.0%** (below the 90% floor) |
 
-Spatial/Object/Goal all comfortably clear 90%, but **LIBERO-Long fails at 87.0%**, driven by two specific complex dual-object mug-placement tasks (`libero_10_4` 50%, `libero_10_6` 60%; every other Long task scored 80-100%). This checkpoint **cannot be promoted as-is** despite its strong RoboTwin numbers. Next steps: determine whether this is a real capability gap (investigate the two weak tasks specifically) or run-to-run noise (repeat at a different seed) before further RoboTwin scaling or a promotion attempt.
+Spatial/Object/Goal all comfortably clear 90%, but **LIBERO-Long is at 87.0%**, driven by two specific complex dual-object mug-placement tasks (`libero_10_4` 50%, `libero_10_6` 60%; every other Long task scored 80-100%). Note: promotion is a tradeoff judgment, not an automatic veto the moment one suite dips under 90% (user correction) -- but this specific case is a genuine regression either way, since Long was 95.0% at exp0012's pre-training baseline (not just below the 90% floor, but below the actual inherited reference). The real question for a promotion decision is whether the RoboTwin capability gained is worth this specific Long regression, once the full 50-task RoboTwin picture is in.
 
-No candidate has undergone full canonical (50-task, Clean+Randomized) RoboTwin evaluation yet — this remains screening-level "best so far," not a promotion.
+**Full 50-task RoboTwin Clean-only scan (n=10) in progress** (started 2026-08-19 08:49, launched per explicit user request "eval full robotwing before moving"): running mean through 42/50 tasks is far lower than the curated 4-task panel suggested (~12% vs 75%) -- only `click_bell`/`open_microwable`/`press_stapler` (100%) and `click_alarmclock` (80%) are genuinely strong; most of the other 46 tasks (including 4 with zero training-data coverage) are weak-to-zero. This is the real evidence needed before any promotion tradeoff decision -- final numbers pending completion.
+
+No candidate has undergone the full canonical protocol (50 tasks x both Clean+Randomized phases, n=100/phase) yet -- current evidence remains screening-level, not canonical.
 
 ### Superseded: exp0013 (full-backbone training on the release-checkpoint parent)
 
