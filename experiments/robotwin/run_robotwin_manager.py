@@ -168,8 +168,11 @@ def main(cfg: DictConfig):
     summary_csv = run_output_dir / "summary.csv"
     summary_json = run_output_dir / "summary.json"
 
+    task_names_cfg = cfg.EVALUATION.get("task_names", None)
     task_name_cfg = cfg.EVALUATION.task_name
-    if task_name_cfg is None or str(task_name_cfg).strip() == "":
+    if task_names_cfg is not None and len(list(task_names_cfg)) > 0:
+        tasks = [str(t) for t in task_names_cfg]
+    elif task_name_cfg is None or str(task_name_cfg).strip() == "":
         tasks = _load_all_tasks()
     else:
         tasks = [str(task_name_cfg)]
