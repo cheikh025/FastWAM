@@ -212,6 +212,16 @@ Resumed per the `CONTINUE_TRAINING` decision above. Weights-only `resume=` resta
 - log: `checkpoints/exp0013_train_cont1.log`, pruner log: `checkpoints/exp0013_pruner_cont1.log` (same `KEEP=1`/15s pattern as the first phase)
 - plan: progress-check again around this run's own local step ~1000-1500 (cumulative ~2000-2500), same cheap panel (LIBERO-Spatial n=3, RoboTwin `click_alarmclock`+`turn_switch` Clean n=5) for direct comparability against the step-1000 numbers above.
 
+### Disk near-miss during cont1, second phase (cont2)
+
+Preserving `step_001000.pt` locally for the progress-check evidence (correct) had an unaccounted side effect: its own pruner exited with the stopped training process, so it stopped being pruned and permanently consumed 12GB of headroom the `cont1` run's own `KEEP=1` pruner arithmetic didn't know about. Disk dropped from 24GB to 12GB free by cont1's step 800 (cumulative 1800) -- below the safe `KEEP=1` threshold, risking a truncated write on the next save. Fixed by: uploading `step_001000.pt` to `cheikh025/ASR` (`research/exp0013_release_parent_disjoint_offset/step_001000.pt`), verifying the remote copy (matching 12,041,907,845-byte size), deleting the local copy (restored to 24GB free), pausing training during this to eliminate any write race, then resuming as `cont2` (new output dir, same step-counter-reset reasoning as `cont1`) from `cont1`'s `step_000800.pt` (cumulative 1800) with `max_steps=2200` (to reach the original cumulative 4000 target).
+
+The exact same issue immediately recurred with `cont1`'s own now-orphaned `step_000800.pt` once `cont2` started (same unaccounted-permanent-checkpoint pattern) -- caught proactively this time before it became urgent, uploaded to `cheikh025/ASR` (`research/exp0013_release_parent_disjoint_offset/step_001800_cumulative.pt`), verified, deleted, restoring 24GB free well before `cont2`'s first save. Standing operational rule now recorded in `research/NOTES.md`: upload+verify+delete any preserved/evaluated checkpoint immediately once a `CONTINUE_TRAINING` decision is made, before or in parallel with (never after) launching the next training phase.
+
+Durable copies now on `cheikh025/ASR`:
+- `research/exp0013_release_parent_disjoint_offset/step_001000.pt` (cumulative step 1000, the evaluated checkpoint: LIBERO-Spatial 100%, RoboTwin click_alarmclock 80%/turn_switch 60%)
+- `research/exp0013_release_parent_disjoint_offset/step_001800_cumulative.pt` (cumulative step 1800, not yet evaluated -- an intermediate save, kept for continuation safety only)
+
 ## 11. Artifacts
 
 - smoke test log: `checkpoints/exp0013_smoke_train.log`, `checkpoints/exp0013_smoke_train_v2.log`
