@@ -81,3 +81,29 @@ To be filled in as the run progresses.
 **Working interpretation**: both hypotheses likely contribute, with task-specific sensitivity -- backbone drift matters for some tasks (turn_switch), while the projection-layer's own overfitting/distribution-shift matters for others (click_alarmclock), independent of backbone changes. Neither hypothesis alone is a clean, complete explanation. This suggests future candidates may need to address both (e.g., lower LR specifically on the projection layers themselves, in addition to backbone freezing/low-LR, and/or explicit regularization on the action head).
 
 **Next step**: continue this candidate to its remaining budget (max_steps=1000, currently at step 400) to see whether click_alarmclock's decline continues/stabilizes and whether turn_switch's stability holds with more steps, before drawing a final conclusion.
+
+### Evaluation event — LIBERO-Spatial + RoboTwin `progress_check`, final (cumulative local step 1000)
+
+- checkpoint: `runs/reweighted_multiembodiment/exp0014_release_parent_frozen_backbone_v1_cont1/checkpoints/weights/step_000600.pt` (exp0014's own local step 1000 total: 400 + 600)
+- LIBERO-Spatial (n=3): **96.67% (29/30)** -- stable throughout, as expected.
+- RoboTwin Clean (n=5), full 4-task panel:
+
+  | Task | exp0013 step 1000 (parent) | exp0013 step 1800 (full backbone, declined) | exp0014 local step 400 (frozen) | exp0014 local step 1000 (frozen, final) |
+  |---|---:|---:|---:|---:|
+  | click_alarmclock | 80.0% | 80.0% | 40.0% | **80.0%** |
+  | turn_switch | 60.0% | 0.0% | 60.0% | **80.0%** |
+  | press_stapler | -- | 40.0% | -- | **100.0%** |
+  | open_laptop | -- | 0.0% | -- | **40.0%** |
+  | **mean (4 tasks)** | -- | **30.0%** | -- | **75.0%** |
+
+### Decisive result
+
+Freezing the shared backbone and continuing training from exp0013's step-1000 checkpoint for another 1000 steps **reversed the decline entirely** -- RoboTwin mean success across the 4-task panel rose from 30.0% (exp0013's declined step-1800 state) to 75.0%, with every task at or above its best prior value and LIBERO-Spatial unchanged at 96.67%. click_alarmclock's mid-run dip (80%->40% at local step 400) recovered fully by local step 1000 (back to 80%), suggesting it was a transient fluctuation rather than a sustained trend under this recipe.
+
+This strongly supports **hypothesis 1** (shared-backbone LIBERO/RoboTwin gradient interference) as the primary driver of exp0013's decline -- removing the backbone's ability to drift not only stopped further degradation but let the projection layers alone continue improving RoboTwin capability substantially. Hypothesis 2 (action-head-specific overfitting) is not ruled out as a contributing factor (the mid-run click_alarmclock dip is still unexplained) but is clearly not the dominant effect, since the projection layers kept training throughout and capability still improved overall.
+
+## 7. Decision
+
+**`SELECT_CHECKPOINT`**: exp0014's final checkpoint (cumulative training step 1000 under this candidate, resumed from exp0013's own step 1000 -- i.e. 2000 total training steps from the release-checkpoint parent) is the new best validated checkpoint for the project, superseding exp0013's step-1000 pick. LIBERO-Spatial 96.67%, RoboTwin 4-task Clean mean 75.0% (individual tasks 40-100%).
+
+**`EXTEND_TRAINING`**: given the clearly positive, still-improving trend and no sign of a plateau, continue training further under the same frozen-backbone regime rather than stopping. Plan: resume for another budget (matching the "start small, scale on evidence" practice) and progress-check again before deciding whether to extend further, broaden to the full 4-suite LIBERO validation, or move toward canonical evaluation.

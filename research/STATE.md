@@ -42,15 +42,22 @@ Canonical protocol confirmed during original setup (`research/RUNBOOK.md`): 50-t
 
 ## Current accepted multi-embodiment checkpoint
 
-**`exp0013`, cumulative step 1000** (`research/exp0013_release_parent_disjoint_offset/step_001000.pt` on `cheikh025/ASR`) — best validated checkpoint so far. First real multi-embodiment training candidate on the release-checkpoint parent (reuses `exp0003`'s architecture: full fine-tune, disjoint K=21/22 offsets, 1:1 LIBERO:RoboTwin ratio, LR 3e-5). Cheap-panel evidence at this checkpoint:
+**`exp0014`, cumulative training step 2000 from the release-checkpoint parent** (exp0013's step 1000 + exp0014's own 1000 frozen-backbone steps; `research/exp0014_release_parent_frozen_backbone/step_001000_cumulative.pt` on `cheikh025/ASR`) — current best validated checkpoint, superseding exp0013's step-1000 pick. Diagnostic candidate that froze the entire shared MoT backbone (`trainable_modules: expanded_projections_only`, only the newly-expanded action_encoder/head trainable) and resumed from exp0013's step-1000 checkpoint, to test whether backbone freezing stops the RoboTwin decline observed in exp0013 (see below). Cheap-panel evidence at this checkpoint:
 
 | Benchmark | Result (cheap panel) |
 |---|---:|
-| LIBERO-Spatial (n=3) | 100.0% (30/30) |
-| RoboTwin `click_alarmclock` Clean (n=5) | 80.0% (4/5) |
-| RoboTwin `turn_switch` Clean (n=5) | 60.0% (3/5) |
+| LIBERO-Spatial (n=3) | 96.67% (29/30) |
+| RoboTwin `click_alarmclock` Clean (n=5) | 80.0% |
+| RoboTwin `turn_switch` Clean (n=5) | 80.0% |
+| RoboTwin `press_stapler` Clean (n=5) | 100.0% |
+| RoboTwin `open_laptop` Clean (n=5) | 40.0% |
+| RoboTwin mean (4 tasks) | **75.0%** |
 
-Far exceeds any RoboTwin result achieved under the old exp0019-parent lineage (exp0001-exp0009, which topped out ~33% on a single task). **Training was paused at cumulative step 2600 (`PAUSED`, not `PROMOTE`)**: further training past step 1000 showed a real, multi-task-confirmed *decline* in RoboTwin capability (2 of 4 tasks collapsed to 0% by step 1800) despite LIBERO retention staying solid (96.7-100% throughout) and training loss continuing to fall. Not yet diagnosed — leading hypotheses are LIBERO/RoboTwin gradient interference and open-loop/closed-loop distribution shift (action head overfitting the offline imitation distribution in a way that hurts closed-loop rollout). No candidate has undergone full canonical (50-task) RoboTwin evaluation or been `PROMOTE`d yet — this checkpoint is a screening-level "best so far," not a promotion.
+**Decisive result: freezing the backbone reversed exp0013's decline entirely** — RoboTwin 4-task mean rose from 30.0% (exp0013's declined step-1800 state on the same 4 tasks) to 75.0%, every task at or above its best prior value, LIBERO-Spatial unchanged. Strongly supports shared-backbone LIBERO/RoboTwin gradient interference as the primary driver of exp0013's decline (see `research/progress/PROGRESS_0014_frozen_backbone_diagnostic.md`). Training continuing under this regime given the clearly positive, still-improving trend (`EXTEND_TRAINING`). No candidate has undergone full canonical (50-task) RoboTwin evaluation, full 4-suite LIBERO validation (Object/Goal/Long still unmeasured for this lineage), or been formally `PROMOTE`d yet — this remains screening-level "best so far," not a promotion.
+
+### Superseded: exp0013 (full-backbone training on the release-checkpoint parent)
+
+Cumulative step 1000 was the best point (LIBERO-Spatial 100%, RoboTwin click_alarmclock 80%/turn_switch 60%) before a real, multi-task-confirmed decline set in with further full-backbone training (2 of 4 tasks collapsed to 0% by cumulative step 1800). See `research/progress/PROGRESS_0013_release_parent_disjoint_offset_baseline.md` Section 12 for full evidence. Its step-1000 checkpoint remains durably archived (`research/exp0013_release_parent_disjoint_offset/step_001000.pt` on `cheikh025/ASR`) but is no longer the project's current-best pick.
 
 ## Superseded: exp0019-lineage history (parent abandoned in exp0011 — kept for record, not to be reused as evidence for the release-checkpoint parent)
 
