@@ -60,3 +60,24 @@ Per standing feedback (start smaller, scale based on evidence): `max_steps: 1000
 ## 5-11. Pending
 
 To be filled in as the run progresses.
+
+## 5. Evaluation events
+
+### Evaluation event — LIBERO-Spatial + RoboTwin `progress_check`, local step 400
+
+- checkpoint: `runs/reweighted_multiembodiment/exp0014_release_parent_frozen_backbone_v1/checkpoints/weights/step_000400.pt`
+- LIBERO-Spatial (n=3): **96.67% (29/30)** -- essentially unchanged from exp0013's step-1000 baseline, as expected (backbone frozen, near-zero drift possible).
+- RoboTwin Clean (n=5), via the new `EVALUATION.task_names` multi-task manager override (true 2-GPU parallelism):
+
+  | Task | exp0013 step 1000 (parent) | exp0014 local step 400 (frozen backbone) |
+  |---|---:|---:|
+  | click_alarmclock | 80.0% | **40.0%** |
+  | turn_switch | 60.0% | **60.0%** |
+
+## 6. Interpretation (partial, more evidence pending)
+
+**Mixed result, not a clean resolution of the two hypotheses.** `turn_switch` held exactly steady (60%->60%) under the frozen backbone -- unlike its collapse to 0% by exp0013's cumulative step 1800 under full-backbone training, suggesting backbone freezing *is* protective for this task (supports hypothesis 1 for turn_switch specifically). But `click_alarmclock` still declined by the same magnitude (80%->40%) despite the backbone being **entirely frozen** -- since nothing but the action_encoder/head could have changed, this decline cannot be attributed to shared-backbone interference, and instead directly implicates the action-encoder/head itself (supports hypothesis 2 for click_alarmclock specifically).
+
+**Working interpretation**: both hypotheses likely contribute, with task-specific sensitivity -- backbone drift matters for some tasks (turn_switch), while the projection-layer's own overfitting/distribution-shift matters for others (click_alarmclock), independent of backbone changes. Neither hypothesis alone is a clean, complete explanation. This suggests future candidates may need to address both (e.g., lower LR specifically on the projection layers themselves, in addition to backbone freezing/low-LR, and/or explicit regularization on the action head).
+
+**Next step**: continue this candidate to its remaining budget (max_steps=1000, currently at step 400) to see whether click_alarmclock's decline continues/stabilizes and whether turn_switch's stability holds with more steps, before drawing a final conclusion.
