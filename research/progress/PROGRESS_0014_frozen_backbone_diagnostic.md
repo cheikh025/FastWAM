@@ -173,3 +173,18 @@ Given the full 50-task result confirms this is a training-scale/coverage gap (no
 LIBERO-Spatial (n=3): 96.67%, stable.
 
 **Continued clear improvement on well-represented tasks** (click_alarmclock, turn_switch both reached 100%) with more training, while `adjust_bottle` (a task that scored 0% in the full 50-task scan too) remains flat -- consistent with the "training-scale/coverage gap" diagnosis: more steps help where the model has real signal to learn from, but cannot substitute for missing/thin per-task data coverage. Continuing training (cont3 still has 1000 steps remaining toward its 2000-step budget, cumulative target 4600).
+
+## 13. Progress check at cumulative step 4600 (cont4, final -- 2000 total steps since the full-50-task scan)
+
+| Task | step 2600 (full-scan point) | step 3600 | step 4600 |
+|---|---:|---:|---:|
+| click_alarmclock | 40.0% | 100.0% | **100.0%** |
+| turn_switch | 20.0% | 100.0% | **80.0%** |
+| open_laptop | 60.0% | 60.0% | **40.0%** |
+| adjust_bottle | 0.0% (full scan) | 0.0% | **0.0%** |
+
+LIBERO-Spatial (n=3): **100.0%**.
+
+click_alarmclock/turn_switch remain strong and well above their full-scan-time values; open_laptop is noisy (n=5) in the 40-60% band; adjust_bottle remains completely flat at 0% across three checkpoints spanning 2000 steps, reinforcing that this is a data-coverage limitation, not something more training alone will fix. cont4 completed its full 1000-step budget (cumulative training now at step 4600 from the release-checkpoint parent, 2000 steps since the full-50-task scan at step 2600).
+
+**Next planned evidence point**: a full-50-task RoboTwin Clean-only rescan at n=5 (per updated guidance) to see whether the 12.6% full-benchmark mean has meaningfully improved with the additional 2000 steps, before deciding whether to extend training further or shift strategy (e.g. addressing data coverage directly).
