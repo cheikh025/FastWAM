@@ -160,3 +160,16 @@ Given the full 50-task result confirms this is a training-scale/coverage gap (no
 - output dir: `runs/reweighted_multiembodiment/exp0014_release_parent_frozen_backbone_v1_cont3`
 - budget: `max_steps=2000` (cumulative target: step 4600 from the release-checkpoint parent)
 - plan: progress-check with the cheap panel at intervals, and run another full-50-task RoboTwin Clean-only scan (n=5 per updated user guidance, not n=10) once meaningful further training has accumulated, to track whether the 12.6% full-benchmark mean is climbing.
+
+## 12. Progress check at cumulative step 3600 (cont3, local step 1000)
+
+| Task | step 2600 | step 3600 |
+|---|---:|---:|
+| click_alarmclock | 80.0% | **100.0%** |
+| turn_switch | 60.0% | **100.0%** |
+| open_laptop | 60.0% | **60.0%** (unchanged, n=5 noise) |
+| adjust_bottle | -- | **0.0%** (new data point, likely little/no training coverage) |
+
+LIBERO-Spatial (n=3): 96.67%, stable.
+
+**Continued clear improvement on well-represented tasks** (click_alarmclock, turn_switch both reached 100%) with more training, while `adjust_bottle` (a task that scored 0% in the full 50-task scan too) remains flat -- consistent with the "training-scale/coverage gap" diagnosis: more steps help where the model has real signal to learn from, but cannot substitute for missing/thin per-task data coverage. Continuing training (cont3 still has 1000 steps remaining toward its 2000-step budget, cumulative target 4600).
