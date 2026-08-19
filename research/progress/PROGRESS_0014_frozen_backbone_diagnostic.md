@@ -151,3 +151,12 @@ Launched per explicit user request ("yes eval full robotwing before moving"). Co
 ### Implication for the promotion tradeoff
 
 Combined with the LIBERO-Long regression (87.0% vs the 95.0% pre-training baseline), the real picture is: this checkpoint has learned real, strong capability on a small number of RoboTwin tasks with good training-data support, at the cost of a specific LIBERO-Long regression on two already-hard tasks -- but is nowhere close to the project's actual full-50-task >=90% RoboTwin target. The gap is not primarily a promotion-tradeoff question at this point; it's a training-scale/coverage question. Next steps should focus on continuing training (more steps, better data coverage/weighting across the 50 tasks) rather than a promotion decision on the current checkpoint.
+
+## 11. Continuation (cont3) — extending training given the validated recipe and the coverage gap
+
+Given the full 50-task result confirms this is a training-scale/coverage gap (not a flawed recipe -- the frozen-backbone approach genuinely reversed exp0013's decline and produced strong per-task capability where training data supports it), the natural next step is more training under the same regime, not a new candidate design. Resumed from cumulative step 2600 with a larger increment (2000 steps, up from the previous 600/1000 increments) now that the recipe is well-validated.
+
+- resume source: `runs/reweighted_multiembodiment/exp0014_release_parent_frozen_backbone_v1_cont2/checkpoints/weights/step_000600.pt` (cumulative step 2600)
+- output dir: `runs/reweighted_multiembodiment/exp0014_release_parent_frozen_backbone_v1_cont3`
+- budget: `max_steps=2000` (cumulative target: step 4600 from the release-checkpoint parent)
+- plan: progress-check with the cheap panel at intervals, and run another full-50-task RoboTwin Clean-only scan (n=5 per updated user guidance, not n=10) once meaningful further training has accumulated, to track whether the 12.6% full-benchmark mean is climbing.
