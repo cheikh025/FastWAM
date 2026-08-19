@@ -107,3 +107,22 @@ This strongly supports **hypothesis 1** (shared-backbone LIBERO/RoboTwin gradien
 **`SELECT_CHECKPOINT`**: exp0014's final checkpoint (cumulative training step 1000 under this candidate, resumed from exp0013's own step 1000 -- i.e. 2000 total training steps from the release-checkpoint parent) is the new best validated checkpoint for the project, superseding exp0013's step-1000 pick. LIBERO-Spatial 96.67%, RoboTwin 4-task Clean mean 75.0% (individual tasks 40-100%).
 
 **`EXTEND_TRAINING`**: given the clearly positive, still-improving trend and no sign of a plateau, continue training further under the same frozen-backbone regime rather than stopping. Plan: resume for another budget (matching the "start small, scale on evidence" practice) and progress-check again before deciding whether to extend further, broaden to the full 4-suite LIBERO validation, or move toward canonical evaluation.
+
+## 8. Full 4-suite LIBERO confirmation (n=10/task) at cumulative step 2600
+
+| Suite | Success (n=10/task) | Meets >=90%? |
+|---|---:|:---:|
+| LIBERO-Spatial | 99.0% (99/100) | yes |
+| LIBERO-Object | 99.0% (99/100) | yes |
+| LIBERO-Goal | 97.0% (97/100) | yes |
+| **LIBERO-Long** | **87.0% (87/100)** | **NO** |
+
+Full run: `checkpoints/exp0014_step2600cum_libero_4suites_n10.log`, `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260819_081729/summary.json`.
+
+**Real promotion blocker, not noise**: Spatial/Object/Goal all comfortably clear 90%, but Long fails at 87.0%, driven specifically by two tasks -- `libero_10_4` ("put the white mug on the left plate and the yellow/white mug on the right plate", 50.0%, 5/10) and `libero_10_6` ("put the white mug on the plate and the chocolate pudding to the right", 60.0%, 6/10) -- both complex, multi-step, dual-object placement tasks. Every other Long task scored 80-100%.
+
+**Cross-checked against exp0012's zero-training baseline** (`evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260818_211301/summary.json`, the release-checkpoint-expanded parent before any multi-embodiment training): these exact same two tasks were *already* the weakest in the suite there too, both at 80.0% (vs 100% for most others), contributing to that baseline's overall Long score of 95.0%. **This is not a new failure mode introduced by training** -- it's a pre-existing marginal spot in the parent checkpoint's own capability that got meaningfully amplified under the current checkpoint (80%->50% and 80%->60%, a real ~20-30pp additional drop each), which is what pushed the suite below the 90% floor. Framing for the next investigation: why did multi-embodiment training specifically worsen these two already-hard, complex dual-object tasks while leaving the rest of Long (and all of Spatial/Object/Goal) intact or improved?
+
+## 9. Updated decision
+
+This checkpoint (exp0014 cumulative training step 2600) is the strongest evidence point so far -- RoboTwin 4-task Clean mean stable at 75%, LIBERO Spatial/Object/Goal all >=97% -- but **cannot be promoted as-is**: LIBERO-Long fails the project's >=90% floor at 87.0%, driven by two specific dual-object mug-manipulation tasks. Before further RoboTwin scaling or a promotion attempt, either (a) investigate/address this specific Long weakness (task-level diagnostic, possibly related to the multi-embodiment padding interacting with longer/more complex action horizons), or (b) confirm whether this is within run-to-run noise via a repeat at a different seed before treating it as a real capability gap. `research/STATE.md` updated to record this as an open blocker.

@@ -53,7 +53,20 @@ Canonical protocol confirmed during original setup (`research/RUNBOOK.md`): 50-t
 | RoboTwin `open_laptop` Clean (n=5) | 40.0% |
 | RoboTwin mean (4 tasks) | **75.0%** |
 
-**Decisive result: freezing the backbone reversed exp0013's decline entirely** — RoboTwin 4-task mean rose from 30.0% (exp0013's declined step-1800 state on the same 4 tasks) to 75.0%, every task at or above its best prior value, LIBERO-Spatial unchanged. Strongly supports shared-backbone LIBERO/RoboTwin gradient interference as the primary driver of exp0013's decline (see `research/progress/PROGRESS_0014_frozen_backbone_diagnostic.md`). Training continuing under this regime given the clearly positive, still-improving trend (`EXTEND_TRAINING`). No candidate has undergone full canonical (50-task) RoboTwin evaluation, full 4-suite LIBERO validation (Object/Goal/Long still unmeasured for this lineage), or been formally `PROMOTE`d yet — this remains screening-level "best so far," not a promotion.
+**Decisive result: freezing the backbone reversed exp0013's decline entirely** — RoboTwin 4-task mean rose from 30.0% (exp0013's declined step-1800 state on the same 4 tasks) to 75.0% by cumulative step 2000, and held stable at 75.0% through cumulative step 2600 (a genuine plateau, not a transient peak). Strongly supports shared-backbone LIBERO/RoboTwin gradient interference as the primary driver of exp0013's decline (see `research/progress/PROGRESS_0014_frozen_backbone_diagnostic.md`).
+
+**Full 4-suite LIBERO confirmation at cumulative step 2600 (n=10/task) — real promotion blocker found**:
+
+| Suite | Success |
+|---|---:|
+| LIBERO-Spatial | 99.0% |
+| LIBERO-Object | 99.0% |
+| LIBERO-Goal | 97.0% |
+| **LIBERO-Long** | **87.0%** (below the 90% floor) |
+
+Spatial/Object/Goal all comfortably clear 90%, but **LIBERO-Long fails at 87.0%**, driven by two specific complex dual-object mug-placement tasks (`libero_10_4` 50%, `libero_10_6` 60%; every other Long task scored 80-100%). This checkpoint **cannot be promoted as-is** despite its strong RoboTwin numbers. Next steps: determine whether this is a real capability gap (investigate the two weak tasks specifically) or run-to-run noise (repeat at a different seed) before further RoboTwin scaling or a promotion attempt.
+
+No candidate has undergone full canonical (50-task, Clean+Randomized) RoboTwin evaluation yet — this remains screening-level "best so far," not a promotion.
 
 ### Superseded: exp0013 (full-backbone training on the release-checkpoint parent)
 
