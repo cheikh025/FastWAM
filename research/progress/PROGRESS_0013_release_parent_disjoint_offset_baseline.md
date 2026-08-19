@@ -133,19 +133,84 @@ Checkpoints are genuinely ~12GB each. With `save_every=200` over `max_steps=4000
 
 ## 7. Evaluation events
 
-None yet.
+Training was stopped cleanly (SIGTERM to the whole process group, `kill -TERM -$TRAIN_PID`) right after the step-1000 checkpoint finished writing, to run this progress check sequentially per the standing rule against stacking training and eval on the same GPUs. Traceback in the training log at this point is the expected `SignalException` from the intentional stop, not a crash.
+
+**Infra gotcha hit during this progress check**: the LIBERO eval manager's first launch attempt silently did nothing for ~1 minute -- a stale orphaned `libero_test_v3` tmux session (leftover from earlier work) caused the tmux server to crash when the manager tried to kill-then-recreate it, so every subsequent pane launch silently failed while the scheduler's bookkeeping still claimed "8/10 running." Diagnosed by cross-checking `nvidia-smi` (0% util on all GPUs) against the scheduler's claim; fixed with `tmux kill-server` + relaunch. Also hit two RoboTwin launch issues on the first attempt: `EVALUATION.clean_only=true` needs the Hydra `+` prefix (`+EVALUATION.clean_only=true`, key not declared in the base YAML schema), and `VK_ICD_FILENAMES` isn't sourced by `venv activate` in a non-interactive shell (must `export` it explicitly per command, despite being in `.env`). All three documented in `research/NOTES.md`.
+
+### Evaluation event — LIBERO-Spatial `progress_check`
+
+- benchmark: `libero`
+- checkpoint / training step: exp0013, step 1000
+- exact command:
+  ```bash
+  python experiments/libero/run_libero_manager.py task=libero_uncond_2cam224_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1/libero_dataset_stats.json \
+    EVALUATION.num_trials=3 MULTIRUN.task_suite_names=[libero_spatial] MULTIRUN.num_gpus=4 MULTIRUN.max_tasks_per_gpu=2 \
+    model.redirect_common_files=false
+  ```
+- reference: pre-training baseline (exp0012/`PROGRESS_0011`) = 98.00% (n=50/task, canonical); this candidate's own release-checkpoint parent, verified.
+- **result: 100.0% (30/30)** -- all 10 tasks 100% (3/3). No retention loss whatsoever at step 1000; comfortably above the 90% floor and even above the canonical pre-training baseline (expected -- n=3 noise near ceiling, not a real improvement claim).
+- artifact: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260819_003915/summary.json`
+- runtime: ~4 min (4-GPU parallel, 2 tasks/GPU).
+
+### Evaluation event — RoboTwin `progress_check` (Clean-only, 2-task panel)
+
+- benchmark: `robotwin`
+- checkpoint / training step: exp0013, step 1000
+- purpose: first-ever RoboTwin capability read for the new release-checkpoint lineage, to decide whether to continue training.
+- exact command (per-task):
+  ```bash
+  export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+  CUDA_VISIBLE_DEVICES=0 python experiments/robotwin/run_robotwin_manager.py task=robotwin_uncond_3cam_384_multiembodiment_eval \
+    ckpt=runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1/checkpoints/weights/step_001000.pt \
+    EVALUATION.dataset_stats_path=runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1/robotwin_dataset_stats.json \
+    EVALUATION.task_name=<click_alarmclock|turn_switch> EVALUATION.eval_num_episodes=5 +EVALUATION.clean_only=true \
+    MULTIRUN.num_gpus=1 MULTIRUN.max_tasks_per_gpu=1
+  ```
+- **result** (n=5 episodes/task, Clean only):
+
+  | Task | Clean (n=5) | exp0004-0007 lineage historical ceiling (old exp0019 parent) |
+  |---|---:|---:|
+  | `click_alarmclock` | **80.0% (4/5)** | 20-33% |
+  | `turn_switch` | **60.0% (3/5)** | not previously tested |
+
+  Both tasks confirmed present in training data (46/50-task coverage, see `research/NOTES.md`).
+- artifacts: `evaluate_results/robotwin/reweighted_multiembodiment_exp0013_release_parent_disjoint_offset_v1/20260819_004749/summary.json`, `.../20260819_005713/summary.json`
+- runtime: ~10 min/task (single GPU, sequential).
+- validity checks: `Render Well` confirmed both runs (no Vulkan ICD issue once fixed), correct checkpoint/stats path, `clean_only` correctly skipped the random phase both times (confirmed via manager log: `manager finished successfully` after 1 phase only).
 
 ## 8. Comparison and interpretation
 
-Pending.
+At only step 1000/4000 (25% of the suggested initial budget), this candidate already shows:
+- **zero measurable LIBERO retention loss** (100% vs. 98% baseline -- within noise of ceiling);
+- **substantially stronger RoboTwin capability than anything achieved under the old exp0019-parent lineage** across exp0001-exp0009 (which topped out around 33% on `click_alarmclock` and 0% on most other tasks tested).
+
+This is strong positive evidence that the parent-checkpoint switch (`PROGRESS_0011`, release checkpoint instead of exp0019) was the right call -- the release checkpoint appears to be a dramatically better starting point for RoboTwin adaptation, not just a fix for exp0019's LIBERO-Spatial fragility.
 
 ## 9. Decision
 
-Pending.
+**`CONTINUE_TRAINING`** -- resume from `step_001000.pt`, remaining budget to reach the original 4000-step suggestion (3000 more steps; not a hard ceiling, may extend further depending on the next progress check). No sign of a plateau, forgetting, or instability that would justify `STOP_TRAINING` or `SELECT_CHECKPOINT` at this early point. Next progress check planned around step ~2000-2500 with the same cheap panel (LIBERO-Spatial n=3 + the same 2-task RoboTwin Clean-only panel, for direct comparability), stopping training again beforehand per the same no-stacking discipline.
 
 ## 10. What this changes for the next experiment
 
-Pending.
+Nothing yet -- still within exp0013's own training run. If this trajectory holds (RoboTwin capability continuing to rise with no LIBERO cost), the next candidate-level question becomes how far this recipe can be pushed before either benchmark plateaus or regresses, and whether the other three LIBERO suites (Object/Goal/Long) hold as well as Spatial did.
+
+## 11b. Continuation (step 1000 -> 4000 cumulative)
+
+Resumed per the `CONTINUE_TRAINING` decision above. Weights-only `resume=` restarts the trainer's internal step counter at 1 (documented resume semantics, `research/RUNBOOK.md`), so this continuation was launched into a **new output directory** (`..._v1_cont1`) rather than the original one, to avoid the continuation's own step 1000 silently overwriting the already-evaluated `step_001000.pt`. **Cumulative step = 1000 + this run's own logged step** for all reporting purposes going forward. A side effect of weights-only resume: the cosine LR schedule also restarts fresh (warmup -> peak 3e-5 -> decay) over this run's own `max_steps=3000`, rather than continuing along the tail of the original single 4000-step curve -- an accepted, previously-used consequence of this codebase's weights-only resume path (matches exp0002's recovery precedent in `research/NOTES.md`), not a bug.
+
+- exact launch command:
+  ```bash
+  source /workspace/venvs/fastwam/bin/activate
+  bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_release_parent_3e-5 \
+    resume=runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1/checkpoints/weights/step_001000.pt \
+    output_dir=./runs/reweighted_multiembodiment/exp0013_release_parent_disjoint_offset_v1_cont1 \
+    model.skip_dit_load_from_pretrain=true model.action_dit_pretrained_path=null model.redirect_common_files=false \
+    max_steps=3000
+  ```
+- log: `checkpoints/exp0013_train_cont1.log`, pruner log: `checkpoints/exp0013_pruner_cont1.log` (same `KEEP=1`/15s pattern as the first phase)
+- plan: progress-check again around this run's own local step ~1000-1500 (cumulative ~2000-2500), same cheap panel (LIBERO-Spatial n=3, RoboTwin `click_alarmclock`+`turn_switch` Clean n=5) for direct comparability against the step-1000 numbers above.
 
 ## 11. Artifacts
 
