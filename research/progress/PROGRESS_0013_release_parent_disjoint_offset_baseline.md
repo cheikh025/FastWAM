@@ -1,9 +1,9 @@
 # PROGRESS_0013 — First real multi-embodiment training candidate on the release-checkpoint parent
 
 - **Experiment ID:** 0013
-- **Status:** `RUNNING` (real training launched, max_steps=4000)
+- **Status:** `PAUSED` -- training stopped at cumulative step 2600 pending diagnosis of a RoboTwin capability decline (see Section 12); best checkpoint selected is cumulative step 1000
 - **Created:** 2026-08-18
-- **Updated:** 2026-08-18
+- **Updated:** 2026-08-19
 - **Parent experiment:** 0012 (release-checkpoint LIBERO/RoboTwin baseline establishment)
 - **Parent checkpoint:** `/home/claudeuser/local_cache/fastwam_release_expanded_zeroinit/step_000000.pt` (official FastWAM LIBERO release checkpoint, expanded to K=21/22 with the zero-init fix)
 - **Selected candidate checkpoint:** none yet
@@ -219,8 +219,48 @@ Preserving `step_001000.pt` locally for the progress-check evidence (correct) ha
 The exact same issue immediately recurred with `cont1`'s own now-orphaned `step_000800.pt` once `cont2` started (same unaccounted-permanent-checkpoint pattern) -- caught proactively this time before it became urgent, uploaded to `cheikh025/ASR` (`research/exp0013_release_parent_disjoint_offset/step_001800_cumulative.pt`), verified, deleted, restoring 24GB free well before `cont2`'s first save. Standing operational rule now recorded in `research/NOTES.md`: upload+verify+delete any preserved/evaluated checkpoint immediately once a `CONTINUE_TRAINING` decision is made, before or in parallel with (never after) launching the next training phase.
 
 Durable copies now on `cheikh025/ASR`:
-- `research/exp0013_release_parent_disjoint_offset/step_001000.pt` (cumulative step 1000, the evaluated checkpoint: LIBERO-Spatial 100%, RoboTwin click_alarmclock 80%/turn_switch 60%)
-- `research/exp0013_release_parent_disjoint_offset/step_001800_cumulative.pt` (cumulative step 1800, not yet evaluated -- an intermediate save, kept for continuation safety only)
+- `research/exp0013_release_parent_disjoint_offset/step_001000.pt` (cumulative step 1000)
+- `research/exp0013_release_parent_disjoint_offset/step_001800_cumulative.pt` (cumulative step 1800)
+- `research/exp0013_release_parent_disjoint_offset/step_002600_cumulative.pt` (cumulative step 2600)
+
+## 12. RoboTwin capability declines with further training past step 1000 -- major finding
+
+### Full evidence table (Clean only, n=5/task except LIBERO n=3/task)
+
+| Cumulative step | LIBERO-Spatial | click_alarmclock | turn_switch | press_stapler | open_laptop | RoboTwin mean (available tasks) |
+|---|---:|---:|---:|---:|---:|---:|
+| 1000 | 100.0% | 80.0% | 60.0% | -- | -- | 70.0% (2 tasks) |
+| 1800 | 96.7% | 80.0% | **0.0%** | 40.0% | **0.0%** | 30.0% (4 tasks) |
+| 2600 | 96.7% | 40.0% | 20.0% | -- | -- | 30.0% (2 tasks) |
+
+Panel broadened from 2 to 4 tasks at the step-1800 checkpoint (user feedback: a 2-task panel is too thin to trust for a real decision) using the new `EVALUATION.task_names=[...]` manager override (see Section 4b) with true 4-GPU parallelism (one manager invocation, `MULTIRUN.num_gpus=4`).
+
+**LIBERO retention is solid and stable throughout (96.7-100%, no real regression).** **RoboTwin capability is not stable**: 2 of 4 tasks tested at step 1800 (`turn_switch`, `open_laptop`) had already collapsed to literal 0%, while `click_alarmclock` held at its step-1000 level (80%) all the way through cumulative step 1800 before also dropping by step 2600 (80%->40%). This is a real, multi-task-confirmed decline, not single-task noise -- despite training loss continuing to fall throughout (step 1000 loss ~0.55 -> cumulative step 2600 loss ~0.15-0.24).
+
+### Ruling out the LR-schedule-restart confound
+
+Because weights-only `resume=` restarts the trainer's step counter (and therefore the cosine LR schedule) on every `_cont*` phase, a live methodological confound is whether the observed decline is a genuine training-dynamics effect or an artifact of repeatedly re-triggering a fresh warmup->peak(3e-5)->decay cycle each time training was stopped for an eval. This can be partially ruled out: `turn_switch`'s collapse (60%->0%) happened entirely *within* `cont1`'s single, uninterrupted schedule (cumulative step 1000->1800, no restart in between) -- so at least this instance of decline is not purely a restart artifact. The `cont1->cont2` transition (a real restart) may still be compounding the `click_alarmclock`/`press_stapler` declines observed later, but is not the sole explanation.
+
+### Leading hypotheses (not yet distinguished)
+
+1. **LIBERO/RoboTwin gradient interference**: LIBERO's video+action loss may be easier to fit (much more mature/tuned prior from the release checkpoint) and could increasingly dominate the shared backbone's updates at a 1:1 batch ratio, degrading RoboTwin's more fragile, newly-initialized capability even as the *combined* training loss keeps falling.
+2. **Open-loop/closed-loop distribution shift**: the training loss is teacher-forced (imitation) while RoboTwin task success is measured via closed-loop autoregressive rollout -- if the action head is overfitting to the exact training-data action distribution, small compounding errors during rollout could increasingly derail episodes even as offline loss improves. This is a classically expected VLA failure mode and independently plausible.
+3. **Repeated LR-schedule restarts** (see above) -- not the sole cause, but plausibly a compounding factor via periodic high-LR perturbations to an already-converged capability.
+
+### Decision
+
+**`SELECT_CHECKPOINT`**: cumulative step 1000 (`research/exp0013_release_parent_disjoint_offset/step_001000.pt` on `cheikh025/ASR`) is the current best validated checkpoint for this candidate -- it is the only point with no observed RoboTwin task at or near 0%, and LIBERO-Spatial was strongest there too (100%).
+
+**`STOP_TRAINING`** this specific continuation trajectory -- extending further past cumulative step 2600 without understanding the decline risks wasting compute chasing a worsening trend. Do not resume `cont2`/launch `cont3` blindly.
+
+**`DIAGNOSE`** is the next step (per `$investigate-fastwam-problem`, triggered by "training loss improves while closed-loop success does not"): before designing the next candidate, determine which of the three hypotheses above (or a combination) best explains the decline. Concrete next diagnostics to consider: per-embodiment loss breakdown (if obtainable) across the 1000->2600 range to check whether RoboTwin's own loss also degrades or only LIBERO's improves; a frozen-backbone or lower-LR variant re-run from the step-1000 checkpoint as a controlled comparison; inspecting whether `press_stapler`/`open_laptop`/`turn_switch` failures are catastrophic collapse (random-looking actions) vs. near-misses (suggesting compounding rollout drift specifically).
+
+## 13. Artifacts (updated)
+
+RoboTwin panel results:
+- step 1000: `evaluate_results/robotwin/reweighted_multiembodiment_exp0013_release_parent_disjoint_offset_v1/20260819_004749/summary.json` (click_alarmclock), `.../20260819_005713/summary.json` (turn_switch)
+- step 1800: `evaluate_results/robotwin/reweighted_multiembodiment_exp0013_release_parent_disjoint_offset_v1_cont1/20260819_040232/summary.json` (4-task panel)
+- step 2600: `evaluate_results/robotwin/reweighted_multiembodiment_exp0013_release_parent_disjoint_offset_v1_cont2/20260819_032323/summary.json` (click_alarmclock), `.../20260819_033033/summary.json` (turn_switch)
 
 ## 11. Artifacts
 

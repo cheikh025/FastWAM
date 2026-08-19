@@ -38,11 +38,19 @@ RoboTwin baseline check (`click_alarmclock`, small panel, n=3) launched immediat
 
 ## RoboTwin evidence
 
-Canonical protocol confirmed during original setup (`research/RUNBOOK.md`): 50-task Aloha-AgileX benchmark, Clean/Randomized tracked separately. Not yet measured for any release-checkpoint-derived candidate — no multi-embodiment training has happened on the new parent yet.
+Canonical protocol confirmed during original setup (`research/RUNBOOK.md`): 50-task Aloha-AgileX benchmark, Clean/Randomized tracked separately. No full canonical (50-task, both phases) evaluation has been run yet for any candidate. Cheap-panel progress-check evidence exists from `exp0013` (see below) — real RoboTwin capability emerged quickly then declined with further training; see `research/progress/PROGRESS_0013_release_parent_disjoint_offset_baseline.md` Section 12 for full analysis.
 
 ## Current accepted multi-embodiment checkpoint
 
-None yet. The project is at the pre-training-candidate stage on the new (release-checkpoint) parent.
+**`exp0013`, cumulative step 1000** (`research/exp0013_release_parent_disjoint_offset/step_001000.pt` on `cheikh025/ASR`) — best validated checkpoint so far. First real multi-embodiment training candidate on the release-checkpoint parent (reuses `exp0003`'s architecture: full fine-tune, disjoint K=21/22 offsets, 1:1 LIBERO:RoboTwin ratio, LR 3e-5). Cheap-panel evidence at this checkpoint:
+
+| Benchmark | Result (cheap panel) |
+|---|---:|
+| LIBERO-Spatial (n=3) | 100.0% (30/30) |
+| RoboTwin `click_alarmclock` Clean (n=5) | 80.0% (4/5) |
+| RoboTwin `turn_switch` Clean (n=5) | 60.0% (3/5) |
+
+Far exceeds any RoboTwin result achieved under the old exp0019-parent lineage (exp0001-exp0009, which topped out ~33% on a single task). **Training was paused at cumulative step 2600 (`PAUSED`, not `PROMOTE`)**: further training past step 1000 showed a real, multi-task-confirmed *decline* in RoboTwin capability (2 of 4 tasks collapsed to 0% by step 1800) despite LIBERO retention staying solid (96.7-100% throughout) and training loss continuing to fall. Not yet diagnosed — leading hypotheses are LIBERO/RoboTwin gradient interference and open-loop/closed-loop distribution shift (action head overfitting the offline imitation distribution in a way that hurts closed-loop rollout). No candidate has undergone full canonical (50-task) RoboTwin evaluation or been `PROMOTE`d yet — this checkpoint is a screening-level "best so far," not a promotion.
 
 ## Superseded: exp0019-lineage history (parent abandoned in exp0011 — kept for record, not to be reused as evidence for the release-checkpoint parent)
 
