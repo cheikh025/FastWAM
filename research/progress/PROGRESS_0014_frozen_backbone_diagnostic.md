@@ -1,7 +1,7 @@
 # PROGRESS_0014 — Frozen-backbone diagnostic: does it stop exp0013's RoboTwin decline?
 
 - **Experiment ID:** 0014
-- **Status:** `RUNNING` (smoke test / launch in progress)
+- **Status:** `DIAGNOSE` (frozen-backbone hypothesis confirmed as helpful, but full 50-task RoboTwin scan shows the real gap to the project goal is training scale/coverage, not this candidate's mechanism)
 - **Created:** 2026-08-19
 - **Updated:** 2026-08-19
 - **Parent experiment:** 0013 (release-parent multi-embodiment training)
@@ -126,3 +126,28 @@ Full run: `checkpoints/exp0014_step2600cum_libero_4suites_n10.log`, `evaluate_re
 ## 9. Updated decision
 
 This checkpoint (exp0014 cumulative training step 2600) is the strongest evidence point so far -- RoboTwin 4-task Clean mean stable at 75%, LIBERO Spatial/Object/Goal all >=97% -- but **cannot be promoted as-is**: LIBERO-Long fails the project's >=90% floor at 87.0%, driven by two specific dual-object mug-manipulation tasks. Before further RoboTwin scaling or a promotion attempt, either (a) investigate/address this specific Long weakness (task-level diagnostic, possibly related to the multi-embodiment padding interacting with longer/more complex action horizons), or (b) confirm whether this is within run-to-run noise via a repeat at a different seed before treating it as a real capability gap. `research/STATE.md` updated to record this as an open blocker.
+
+## 10. Full 50-task RoboTwin evaluation (Clean-only, n=10/task) at cumulative step 2600
+
+Launched per explicit user request ("yes eval full robotwing before moving"). Command: `run_robotwin_manager.py` with no `task_name`/`task_names` filter (loads all 50 canonical tasks), `EVALUATION.eval_num_episodes=10 +EVALUATION.clean_only=true MULTIRUN.num_gpus=4 MULTIRUN.max_tasks_per_gpu=1`. Log: `checkpoints/exp0014_step2600cum_robotwin_full50_clean_n10.log`. Full results: `evaluate_results/robotwin/reweighted_multiembodiment_exp0014_release_parent_frozen_backbone_v1_cont2/20260819_084901/summary.json`.
+
+**Runtime**: ~8h51m wall-clock (08:49:01 -> 17:40:34), 4-way GPU parallelism. Confirmed a strong correlation between success and episode duration: successful episodes terminate early (6-13 min), failing episodes run out the full per-task step-limit horizon before timing out (27-80 min) -- so evaluation gets meaningfully faster as the model improves, not just more successful. Per user feedback, future full-50-task scans should default to n=5 (not n=10) given this cost.
+
+### Final result: 12.6% mean Clean success across all 50 tasks
+
+| Success | Tasks |
+|---|---|
+| 100% | `click_bell`, `open_microwave`, `press_stapler` |
+| 90% | `turn_switch` |
+| 80% | `click_alarmclock` |
+| 50% | `shake_bottle_horizontally` |
+| 30% | `shake_bottle` |
+| 10% | `move_playingcard_away`, `place_a2b_right`, `place_bread_skillet`, `put_bottles_dustbin` |
+| 40% | `open_laptop` |
+| 0% | remaining 40 tasks (including the 4 confirmed zero-training-data tasks: `blocks_ranking_rgb/size`, `handover_mic/block`) |
+
+**This is a much more sobering picture than the curated 4-task cheap panel (75% mean) suggested.** The curated panel (click_alarmclock, turn_switch, press_stapler, open_laptop) happened to select 4 of the model's genuinely strongest tasks -- not a representative sample of the full 50-task benchmark. Only 6 of 50 tasks clear 50%; the other 44 are weak-to-zero, dominated by tasks with little/no training-data exposure or that the model simply has not yet learned within this very early (2600-step) training budget.
+
+### Implication for the promotion tradeoff
+
+Combined with the LIBERO-Long regression (87.0% vs the 95.0% pre-training baseline), the real picture is: this checkpoint has learned real, strong capability on a small number of RoboTwin tasks with good training-data support, at the cost of a specific LIBERO-Long regression on two already-hard tasks -- but is nowhere close to the project's actual full-50-task >=90% RoboTwin target. The gap is not primarily a promotion-tradeoff question at this point; it's a training-scale/coverage question. Next steps should focus on continuing training (more steps, better data coverage/weighting across the 50 tasks) rather than a promotion decision on the current checkpoint.
