@@ -1,0 +1,51 @@
+# @package _global_
+#
+# exp0014 (PROGRESS_0014): diagnostic candidate testing whether freezing the shared
+# backbone stops the RoboTwin capability decline observed in exp0013 past cumulative
+# step 1000 (2 of 4 tested RoboTwin tasks collapsed to 0% by step 1800 despite training
+# loss continuing to fall; LIBERO stayed solid at 96.7-100% throughout).
+#
+# Resumes from exp0013's SELECTED best checkpoint (cumulative step 1000, the strongest
+# validated point: LIBERO-Spatial 100%, RoboTwin click_alarmclock 80%/turn_switch 60%),
+# not from the release-checkpoint parent -- this candidate builds on exp0013's already-
+# established RoboTwin capability rather than re-learning it from scratch.
+#
+# Only modification: trainable_modules: expanded_projections_only -- freezes the ENTIRE
+# shared backbone (both video and action MoT/DiT experts); only the newly-expanded
+# action_encoder + head (the disjoint-offset projection layers) remain trainable. This
+# directly distinguishes the two leading hypotheses from PROGRESS_0013 Section 12:
+#   - if RoboTwin capability stabilizes/stops declining -> supports hypothesis 1
+#     (shared-backbone LIBERO/RoboTwin gradient interference was the driver)
+#   - if RoboTwin capability still declines despite a frozen backbone -> supports
+#     hypothesis 2 (the action-encoder/head itself overfitting the offline imitation
+#     distribution in a way that specifically hurts closed-loop rollout stability,
+#     independent of backbone drift)
+#
+# Everything else (data mixture, LR, batch size, disjoint K=21/22 offsets) is identical
+# to exp0013's config, for a clean, isolated comparison.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 2
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: expanded_projections_only
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
