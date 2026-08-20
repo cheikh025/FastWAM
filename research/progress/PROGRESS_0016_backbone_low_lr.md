@@ -1,7 +1,7 @@
 # PROGRESS_0016 — Partial backbone plasticity (dit_with_backbone_low_lr)
 
 - **Experiment ID:** 0016
-- **Status:** `RUNNING` (smoke test / launch in progress)
+- **Status:** `RUNNING` (real training, step 200/1000 checked, LIBERO holding at 100%)
 - **Created:** 2026-08-20
 - **Updated:** 2026-08-20
 - **Parent experiment:** 0014 (frozen-backbone diagnostic); 0015 (RoboTwin-heavy ratio, REJECT)
