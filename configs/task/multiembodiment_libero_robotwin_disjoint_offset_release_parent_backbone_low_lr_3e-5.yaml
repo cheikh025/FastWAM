@@ -1,0 +1,50 @@
+# @package _global_
+#
+# exp0016 (PROGRESS_0016): tests partial backbone plasticity (`dit_with_backbone_low_lr`)
+# as the next lever after two consecutive negative results on the "more RoboTwin
+# exposure" axis (exp0014's cont3/cont4: more steps, no movement; exp0015: 3x RoboTwin
+# gradient share, no movement -- both flat at ~11.6-12.6% full-50-task mean). This
+# points to a structural bottleneck: `expanded_projections_only`'s limited trainable
+# capacity (only action_encoder/head) may simply be too small to represent 50 distinct
+# bimanual manipulation behaviors from a frozen, LIBERO-tuned backbone representation.
+#
+# `dit_with_backbone_low_lr` interpolates between exp0014's full-freeze
+# (`expanded_projections_only`, capacity-limited) and exp0013's full-train (`dit`,
+# proven to interfere with LIBERO and decline over time) -- the shared backbone stays
+# trainable, but at a much lower LR (backbone_lr=3e-6, 10x below the projection LR)
+# than the action_encoder/head (learning_rate=3e-5). This is the same recipe as the
+# old exp0005 (PROGRESS_0005), which was motivated on the OLD exp0019 lineage but
+# never conclusively tested there due to that lineage's other confounds -- never
+# tested at all under the current release-checkpoint parent.
+#
+# Resumes from exp0014's cumulative-4600 checkpoint (current project best). Reverts
+# to the standard 1:1 LIBERO:RoboTwin data mixture (multiembodiment_libero_robotwin,
+# not exp0015's robotwin_heavy variant) since exp0015 showed ratio isn't the lever --
+# isolates backbone plasticity as the only new variable.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 2
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: dit_with_backbone_low_lr
+backbone_lr: 3e-6
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 1000
+log_every: 10
+save_every: 200
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: null
