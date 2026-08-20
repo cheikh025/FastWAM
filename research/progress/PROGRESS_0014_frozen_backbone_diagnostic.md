@@ -1,7 +1,7 @@
 # PROGRESS_0014 — Frozen-backbone diagnostic: does it stop exp0013's RoboTwin decline?
 
 - **Experiment ID:** 0014
-- **Status:** `DIAGNOSE` (frozen-backbone hypothesis confirmed as helpful, but full 50-task RoboTwin scan shows the real gap to the project goal is training scale/coverage, not this candidate's mechanism)
+- **Status:** `STOP_TRAINING` (frozen-backbone hypothesis confirmed as helpful; a second full-50-task rescan 2000 steps later showed no movement, decisively resolving the gap as a data-coverage limitation rather than training duration -- next step is `DIAGNOSE` on RoboTwin per-task data density before a new candidate)
 - **Created:** 2026-08-19
 - **Updated:** 2026-08-19
 - **Parent experiment:** 0013 (release-parent multi-embodiment training)
@@ -188,3 +188,19 @@ LIBERO-Spatial (n=3): **100.0%**.
 click_alarmclock/turn_switch remain strong and well above their full-scan-time values; open_laptop is noisy (n=5) in the 40-60% band; adjust_bottle remains completely flat at 0% across three checkpoints spanning 2000 steps, reinforcing that this is a data-coverage limitation, not something more training alone will fix. cont4 completed its full 1000-step budget (cumulative training now at step 4600 from the release-checkpoint parent, 2000 steps since the full-50-task scan at step 2600).
 
 **Next planned evidence point**: a full-50-task RoboTwin Clean-only rescan at n=5 (per updated guidance) to see whether the 12.6% full-benchmark mean has meaningfully improved with the additional 2000 steps, before deciding whether to extend training further or shift strategy (e.g. addressing data coverage directly).
+
+## 14. Full 50-task RoboTwin rescan (n=5) at cumulative step 4600 -- decisive finding
+
+Rescan launched immediately after cont4 completed, per plan. Command matches Section 10 but with `EVALUATION.eval_num_episodes=5` (per updated user guidance) and no `task_names` filter (all 50 tasks). Log: `checkpoints/exp0014_step4600cum_robotwin_full50_clean_n5.log`. Results: `evaluate_results/robotwin/reweighted_multiembodiment_exp0014_release_parent_frozen_backbone_v1_cont4/20260819_210650/summary.json`.
+
+**Result: 11.6% mean Clean success across all 50 tasks** -- essentially unchanged from 12.6% at cumulative step 2600 (n=10), despite 2000 additional frozen-backbone training steps in between. 10/50 tasks show any nonzero success (`click_alarmclock`/`open_microwave`/`press_stapler` 100%, `click_bell` 80%, `turn_switch` 60%, `move_playingcard_away`/`shake_bottle_horizontally` 40%, `open_laptop`/`put_bottles_dustbin`/`shake_bottle` 20%) -- nearly the identical set of ~10-11 tasks that showed any capability at cumulative step 2600, just with individually shifted percentages (some up, some down, within n=5/n=10 noise).
+
+**This is decisive: the ~12% full-benchmark ceiling is a fixed data-coverage limitation, not a training-duration problem.** The curated-panel tasks (click_alarmclock, turn_switch, open_laptop) kept improving steadily with more steps (Section 12-13), but this improvement is entirely confined to the same small set of well-represented tasks -- it does not spread to the other ~40 tasks, and 2000 more steps produced no measurable movement in the full-benchmark mean. Continuing to extend training under the current recipe (same frozen-backbone approach, same 1:1 LIBERO:RoboTwin data mixture) is very unlikely to close the gap to the project's 90% full-50-task target.
+
+## 15. Decision
+
+**`STOP_TRAINING`** this specific trajectory (exp0014, frozen-backbone resumed from exp0013's step 1000) -- further steps under the current recipe/data mixture are not expected to move the full-50-task metric, based on direct before/after evidence across 2000 steps.
+
+**`DIAGNOSE`** is the necessary next step before designing a new candidate: investigate actual per-task episode counts/data density in the RoboTwin training set (`data/robotwin2.0/robotwin2.0/meta/episodes.jsonl` -- only spot-checked for 4 fully-absent tasks so far, never counted per-task density across all 46 "covered" tasks). The working hypothesis is that most of the ~40 weak/zero tasks have thin or highly imbalanced per-task representation relative to the ~10 tasks that show real capability, and no amount of additional training on the current mixture will fix that without addressing data coverage/weighting directly (e.g. per-task oversampling, or determining whether more RoboTwin source data needs to be acquired/generated for underrepresented tasks).
+
+Current best checkpoint remains exp0014 cumulative step 4600 (durably backed up: `cheikh025/ASR:research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt`) -- strongest LIBERO-Spatial (100%) and strongest curated-panel RoboTwin numbers, but the full-50-task mean (11.6%) is the honest metric against the actual project goal.
