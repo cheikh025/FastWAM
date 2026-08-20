@@ -56,3 +56,13 @@ Per standing feedback (start smaller, scale on evidence): `max_steps: 1000`, `sa
 ## 5-11. Pending
 
 To be filled in as the run progresses.
+
+## 5. Evaluation events
+
+### Evaluation event — LIBERO-Spatial + RoboTwin `progress_check`, local step 200 (early check, per the reintroduced-retention-risk plan)
+
+- checkpoint: `runs/reweighted_multiembodiment/exp0016_backbone_low_lr_v1/checkpoints/weights/step_000200.pt`
+- LIBERO-Spatial (n=3): **100.0% (30/30)** -- no sign of degradation yet at this early point, backbone LR is low (3e-6) so drift should be slow if it happens at all.
+- RoboTwin Clean (n=5): click_alarmclock 100%, turn_switch 60%, adjust_bottle **20%** (new -- never nonzero at any exp0014/exp0015 checkpoint), open_laptop 0% (down from the recent 40-60% range).
+
+Mixed early signal: `adjust_bottle`'s first-ever nonzero result is a potentially promising sign that backbone plasticity provides real additional capacity, but `open_laptop`'s dip could equally be noise at n=5. Too early to draw conclusions -- resuming training, will check again at the next checkpoint given the standing plan to monitor LIBERO closely for this candidate.
