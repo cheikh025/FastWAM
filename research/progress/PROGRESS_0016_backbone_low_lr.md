@@ -74,3 +74,11 @@ Mixed early signal: `adjust_bottle`'s first-ever nonzero result is a potentially
 - RoboTwin Clean (n=5): click_alarmclock 80%, turn_switch 60%, open_laptop 20%, adjust_bottle 0% (the step-200 20% signal on adjust_bottle didn't hold -- likely was n=5 noise).
 
 Broadly comparable to the established range from exp0014/exp0015 -- no dramatic broadening yet, but also no LIBERO risk materializing. Resuming training toward the remaining budget (600 more steps), continuing the closer-than-usual monitoring cadence for this candidate.
+
+### Evaluation event — LIBERO-Spatial + RoboTwin `progress_check`, cumulative step 600
+
+- checkpoint: `runs/reweighted_multiembodiment/exp0016_backbone_low_lr_v1_cont2/checkpoints/weights/step_000200.pt`
+- LIBERO-Spatial (n=3): **100.0% (30/30)** -- fully recovered, no decline trend visible across 600 cumulative steps of backbone plasticity.
+- RoboTwin Clean (n=5): click_alarmclock 80%, turn_switch 60%, open_laptop 20%, adjust_bottle 0% -- essentially identical to cumulative step 400, stable.
+
+No dramatic movement in either direction. LIBERO retention risk has not materialized through 600 cumulative steps (vs. exp0013's full-LR full-train, which took 800-1800 steps to visibly decline -- this candidate's much lower backbone LR appears to be doing its job so far). Resuming for the final 400 steps toward the full 1000-step budget; will run the decisive full-50-task rescan on the final checkpoint.
