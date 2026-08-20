@@ -53,3 +53,13 @@ Per standing feedback (start smaller, scale on evidence): `max_steps: 1000`, `sa
 ## 5-11. Pending
 
 To be filled in as the run progresses.
+
+## 5. Evaluation events
+
+### Evaluation event — LIBERO-Spatial + RoboTwin `progress_check`, local step 600
+
+- checkpoint: `runs/reweighted_multiembodiment/exp0015_robotwin_heavy_v1/checkpoints/weights/step_000600.pt`
+- LIBERO-Spatial (n=3): **100.0% (30/30)** -- confirms retention holds even with the RoboTwin-heavier ratio (as expected, backbone frozen).
+- RoboTwin Clean (n=5): click_alarmclock 100%, turn_switch 80%, open_laptop 40%, adjust_bottle 0% -- very similar to exp0014's own trajectory at comparable points; `adjust_bottle` (the persistent zero-task) shows no change yet.
+
+No clear broadening signal at this early point (step 600/1000, effective RoboTwin exposure roughly comparable to exp0014's own early checks given the 3x ratio only partially offsets the shorter step count so far). Resuming training toward the full 1000-step budget; the decisive test is a full-50-task rescan once training completes, compared directly against exp0014's flat 11.6-12.6% baseline.
