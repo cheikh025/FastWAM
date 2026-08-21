@@ -312,3 +312,53 @@ disk pressure returns.
 new/changed config, actively monitor `df -h` during the run (not just after), especially for any
 job whose write volume scales with a large discovered list -- don't assume "the same script
 worked fine before" transfers to "it'll behave the same against a different config shape."
+
+## Candidate idea for exp0017 -- RoboTwin-first curriculum (not yet implemented)
+
+Per user suggestion while exp0016's 5000-step extension was running: instead of a flat 1:1
+(or flat 3:1, as exp0015 tried) LIBERO:RoboTwin sampling ratio held constant for the whole run,
+front-load RoboTwin exposure early in training -- when the low-LR backbone plasticity has the
+most room to adapt and LIBERO retention risk is lowest (freshly resumed from a strong LIBERO
+checkpoint) -- then optionally rebalance back toward LIBERO later in the run for retention
+consolidation. This is an *ordering* change, distinct from exp0015's flat-ratio test (which
+failed at the same undertrained ~1600-cumulative-step scale as everything else, so it was never
+a fair test of ratio either). Would need: (1) a step-scheduled or step-conditioned ratio in
+`InterleavedEmbodimentSampler`/`build_multi_embodiment_dataset` (currently only supports a fixed
+`ratio:` per embodiment in the data config, not a schedule), (2) a concrete schedule shape (e.g.
+RoboTwin-heavy for the first N steps, then flip to 1:1 or LIBERO-heavy), (3) LIBERO sentinel
+checks concentrated around the ratio-flip point where retention risk is most likely to surface.
+Recorded here so it isn't lost; not yet designed as a full exp0017 candidate record.
+
+## GPU throughput diagnosis -- straggler effect from mixed-embodiment batch cost, confirmed via config inspection (2026-08-21)
+
+Investigated why multi-embodiment training (~0.0215 steps/s) is much slower than LIBERO-only
+training was, and why `nvidia-smi` shows only 1-2 of 4 GPUs near-saturated at any instant
+(rotating over time) instead of all 4 staying synchronized near 100%, during exp0016's cont4/cont5
+phases. Three concrete, config-confirmed factors:
+
+1. **Resolution/cameras**: LIBERO uses 2 cameras @ 224px (`libero_uncond_2cam224_*`); RoboTwin
+   uses 3 cameras @ 384px (`robotwin_uncond_3cam_384_*`) -- roughly 4.4x more image pixels per
+   sample feeding the 5B-param video expert.
+2. **Gradient checkpointing**: LIBERO-only task configs set `mot_checkpoint_mixed_attn: false`;
+   the multi-embodiment backbone-low-lr config sets it `true` (recomputes forward activations
+   during backward to save memory, at a real compute cost).
+3. **Batch size**: LIBERO-only used `batch_size=16, gradient_accumulation_steps=1`; the
+   multi-embodiment config uses `batch_size=2, gradient_accumulation_steps=4` (same 8
+   samples/step per GPU nominally, but far smaller per-microbatch parallelism and more
+   accumulation overhead) -- a deliberate memory tradeoff for RoboTwin's much larger per-sample
+   footprint plus a fully-unfrozen 6B-param backbone.
+
+Working hypothesis for the *rotating* (not just slow) utilization pattern specifically: the
+`InterleavedEmbodimentSampler` hands different ranks LIBERO vs. RoboTwin batches within the same
+synchronized DeepSpeed ZeRO2 step. Since a RoboTwin batch costs substantially more compute than a
+LIBERO batch (points 1-2 above), the rank(s) that drew the cheap LIBERO batch finish early and
+sit idle waiting for the rank(s) processing the expensive RoboTwin batch before the collective
+gradient sync/optimizer step can proceed -- a classic synchronized-data-parallel straggler
+effect from heterogeneous per-rank batch cost. Not yet confirmed by direct profiling (e.g.
+per-rank step timing breakdown), but consistent with every observation so far (single-GPU spikes
+rotating across ranks over time, GPU memory only ~65-67% utilized so not memory-bound, and the
+same pattern present in earlier exp0016 phases before this was flagged). Worth a real
+`$investigate-fastwam-problem` profiling pass before exp0017 if throughput continues to matter --
+e.g. checking whether per-rank batches could be composed to balance embodiment cost within a
+step, or whether GPU memory headroom (~26-28GB free per 80GB A100) could support a larger batch
+size if the bottleneck turns out to be sync-related rather than a hard memory ceiling.

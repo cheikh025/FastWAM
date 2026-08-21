@@ -83,6 +83,20 @@ Spatial/Object/Goal all comfortably clear 90%, but **LIBERO-Long is at 87.0%**, 
 
 Current best checkpoint: exp0014 cumulative step 4600 (`cheikh025/ASR:research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt`) -- strongest LIBERO-Spatial (100%) and curated-panel RoboTwin numbers, but the full-50-task mean (11.6%) is the honest metric against the actual project goal, still far below 90%.
 
+### exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`) -- IN PROGRESS, currently training an extension
+
+Tests the recommended next lever above: shared backbone stays trainable but at `backbone_lr=3e-6` (10x below the `3e-5` projection LR), resumed from exp0014's cumulative-4600 checkpoint, standard 1:1 LIBERO:RoboTwin ratio (exp0015 already ruled out ratio as the lever).
+
+**Phase 1 (1000 steps) result**: full-50-task RoboTwin Clean mean **9.6%** (n=5) -- flat/no improvement vs. exp0014/exp0015's 11.6%. LIBERO-Spatial held at 96.67%, no retention cost. Checkpoint backed up: `cheikh025/ASR:research/exp0016_backbone_low_lr/step_001000_cumulative.pt`.
+
+**Reframe (key insight, changes how to read exp0014/15/16 phase-1 all together)**: `num_epochs=1` never actually binds -- `max_steps` does, and at this project's measured throughput (~0.0215 steps/s, `batch_size=2 x world_size=4 x grad_accum=4` = 32 samples/optimizer-step), RoboTwin's training pool alone is ~6.01M samples. exp0014 (cumulative 4600), exp0015 (~1600), and exp0016 phase 1 (1000) all covered well under 1% of even one RoboTwin epoch each. A flat full-50-task result at that scale is not strong evidence against a lever -- it's more likely nobody has tested any lever at a scale where a data-coverage effect could show up at all.
+
+**Current action (per explicit user decision)**: running a much larger extension from the phase-1 checkpoint -- intermediate budget of **5000 steps** (~2.5 days wall-clock at current throughput) chosen as a step between the too-small 1-2k range and a full 20k+ commitment (~10 days), pending whether 5000 shows any RoboTwin movement. Mid-extension check at cumulative ~1500 (cont4, local step 500): **full 4-suite LIBERO = 98.33% overall (Spatial 96.67%, Object 100%, Goal 100%, Long 96.67%)** -- no retention damage from continued backbone plasticity. RoboTwin not yet re-checked at this later step; the full-50-task decisive rescan is planned for the end of the 5000-step run (cumulative step 6000). As of this note, training is in its `_cont5` phase, actively running.
+
+**Also flagged, not yet root-caused**: GPU utilization during this multi-embodiment training rotates across the 4 GPUs (only 1-2 near-saturated at any instant) rather than staying synchronized near 100% -- likely a straggler effect from the `InterleavedEmbodimentSampler` giving different ranks LIBERO vs. RoboTwin batches of very different compute cost within the same synchronized DeepSpeed step (RoboTwin's 3cam/384px vs. LIBERO's 2cam/224px, plus `mot_checkpoint_mixed_attn: true` for this config vs. `false` for LIBERO-only). GPU memory is only ~65-67% utilized (not memory-bound), so this is a real lead for a future throughput investigation before committing to a 20k+ step run. Full detail: `research/NOTES.md`, `research/progress/PROGRESS_0016_backbone_low_lr.md`.
+
+**Candidate idea recorded for exp0017 (not yet implemented)**: a RoboTwin-first curriculum -- front-load RoboTwin sampling ratio early in training (most backbone plasticity, freshest LIBERO retention margin), then rebalance toward LIBERO later for consolidation -- distinct from exp0015's flat-ratio test, which was itself undertrained. See `research/NOTES.md`.
+
 No candidate has undergone the full canonical protocol (50 tasks x both Clean+Randomized phases, n=100/phase) yet -- current evidence remains screening-level.
 
 ### Superseded: exp0013 (full-backbone training on the release-checkpoint parent)
