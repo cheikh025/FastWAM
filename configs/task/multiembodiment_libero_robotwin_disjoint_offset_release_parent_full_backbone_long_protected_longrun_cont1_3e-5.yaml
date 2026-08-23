@@ -1,0 +1,60 @@
+# @package _global_
+#
+# exp0017 cont1: continuation after an unplanned machine restart (2026-08-23, ~07:27
+# UTC) killed the original run mid-flight at logged step 2740/20000 (last checkpoint
+# saved: step_002500.pt). The underlying instance appears to have been stopped/
+# restarted (not a destructive recycle -- /workspace data, venv, and checkpoints all
+# survived intact); see PROGRESS_0017 Section 6 for full detail.
+#
+# `save_full_state` was `false` on the original launch, so no directory-resume
+# checkpoint exists -- resuming from the weights-only step_002500.pt file necessarily
+# resets `global_step`/optimizer/LR-scheduler to 0 (confirmed directly in
+# `trainer.py::_resume_or_load_checkpoint`: "Loaded .pt weights only;
+# optimizer/scheduler/step were not restored" -- documented, expected behavior for a
+# file resume, not a bug). This means the LR schedule restarts its own warmup+cosine
+# shape for this continuation phase rather than seamlessly continuing from where it
+# left off (LR was ~2.94e-05, just past peak 3.00e-05, when the crash happened -- close
+# to the start of the schedule, so the disruption from a fresh restart should be far
+# milder than the historical directory-resume LR-corruption bug this project already
+# found and fixed, which re-warmed a checkpoint that had decayed much further into its
+# schedule).
+#
+# `max_steps` reduced 20000 -> 17500 to keep the *total* cumulative training exposure
+# across both phases close to the originally-planned 20000 (2500 already completed in
+# phase 1 + up to 17500 here). Cumulative step bookkeeping: this config's own
+# global_step + 2500.
+#
+# `save_full_state` flipped to `true` this time -- given today's demonstrated real risk
+# of an unplanned restart, a full accelerate/deepspeed state save enables a genuinely
+# seamless directory-resume (preserves optimizer momentum, continues the LR decay
+# without disruption) if this happens again, avoiding a second schedule restart. State
+# saves are large (~130GB estimated for this model size per the sibling project's own
+# record) -- prune to keep only the latest one locally each time a new one lands
+# (standing disk-management convention), given ~936GB free at last check.
+#
+# Everything else (data mixing, trainable_modules, LR, batch_size) unchanged from the
+# original exp0017 config.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 17500
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5/2026-08-23_02-32-14/checkpoints/weights/step_002500.pt
