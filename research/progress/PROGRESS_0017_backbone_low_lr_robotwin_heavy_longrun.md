@@ -1,0 +1,134 @@
+# PROGRESS_0017 — full_backbone_long_protected_longrun
+
+- **Experiment ID:** 0017
+- **Status:** `PLANNED`
+- **Created:** 2026-08-22
+- **Updated:** 2026-08-22 (revised design — see "Design revision" note below)
+- **Parent experiment:** 0014 (release_parent_frozen_backbone)
+- **Parent checkpoint:** `cheikh025/ASR:research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt` (current project-best checkpoint; single-arm RoboTwin capability banked, LIBERO-Long previously measured at 87.0% — below floor — at an earlier point in this same lineage, cumulative step 2600, never re-confirmed)
+- **Selected candidate checkpoint:** TBD
+- **Git branch:** `autoresearch/robotwin-multiembodiment-v1`
+- **Git commit:** TBD (recorded after commit)
+
+### Design revision 2 (2026-08-22, before launch) — patience on early signals, larger ceiling
+
+Explicit user correction: every prior negative/collapse verdict in this project's RoboTwin work (`exp0013`'s collapse, `exp0014`/`exp0015`'s "flat ceiling", `exp0016` phase-1's "no movement") was drawn from well under 1-2000 steps against a ~188k-step epoch — not enough exposure to trust as a real conclusion about what full-backbone-with-protection can or can't do. **This run must not repeat that mistake**: `max_steps` raised from 8000 to **20000** (still a ceiling/ambition, not a promise), and the progress-check philosophy changed from "stop immediately if `exp0013`'s collapse signature reappears" to "monitor and record trends from early on, but do not make a STOP_TRAINING call from an early dip alone — let the run reach a genuinely large step count (several thousand at minimum) before drawing a conclusion, unless something catastrophic and unambiguous happens (NaN/divergent loss, or a sustained collapse that persists and worsens over thousands of further steps rather than a transient dip)." `save_every` raised to 500 (from 200) given the much larger step ceiling, to keep checkpoint/disk overhead reasonable at this scale.
+
+### Design revision (2026-08-22, before launch)
+
+Originally designed as a backbone-plasticity (`dit_with_backbone_low_lr`) + RoboTwin-heavy-ratio candidate, resuming from `exp0016`. Revised per explicit user direction after reviewing what the sibling LIBERO-only project (`autoresearch/libero90-v1`) actually did: **that project always did a full, unfrozen `model.dit` fine-tune** (confirmed directly in their `Wan22Trainer._apply_dit_only_train_mode` — no LoRA/adapters, no partial freezing) and solved its own forgetting problem entirely through **iteratively-tuned data-mix oversampling** (Goal 5x-7x, Long 5x-10x), not by freezing or slowing down the backbone. This project jumped to freezing (`exp0002`/`0004`/`0014`) and low-LR backbone plasticity (`exp0005`/`0016`) after `exp0013`'s full-backbone run collapsed — but that collapse happened under a **plain, unprotected 1:1 mix**, and was never retested with LIBERO-protective mixing or run long enough to see whether the decline was transient (the sibling project's own literature review, arXiv 2603.03818, found pretrained/converged models that do regress typically recover within 6-10% of original training steps). This candidate tests that directly, before the lower-capacity plasticity approach — full-backbone unfreezing is a strict superset of low-LR partial plasticity in terms of representational capacity, so it's the more informative first test of the "capacity gap, not data gap" theory from Section 2 below, if it can avoid repeating `exp0013`'s interference collapse. The originally-designed plasticity+ratio candidate is kept as the queued next step (task config already written: `configs/task/multiembodiment_libero_robotwin_disjoint_offset_release_parent_backbone_low_lr_robotwin_heavy_longrun_3e-5.yaml`) if this one shows renewed collapse or doesn't improve broad RoboTwin coverage.
+
+## 1. Result at a glance
+
+TBD — filled in as the run progresses.
+
+## 2. Research state before experiment
+
+### Accepted RoboTwin state
+
+- Full-50-task Clean mean: 11.6% (n=5) at exp0014 cumulative step 4600; exp0016 phase-1 (1000 steps, frozen-then-low-LR backbone) was flat at 9.6% (n=5) — no movement from more steps (exp0014 cont3/cont4) or a heavier RoboTwin ratio (exp0015), but **both of those negative results were obtained under a fully or near-fully frozen backbone**, i.e. with no representational capacity available to spend on anything new regardless of data exposure.
+- ~10-11 of 50 tasks show any nonzero success; the rest are flat at 0%.
+- **New diagnostic (2026-08-22, this machine)**: the successful set is overwhelmingly single-arm (`click_alarmclock`, `open_microwave`, `press_stapler`, `click_bell`, `turn_switch`, `move_playingcard_away`, `shake_bottle_horizontally`, `open_laptop`, `put_bottles_dustbin`, `shake_bottle` — 7/10 explicitly single-arm by RoboTwin's own task description, 3/10 ambiguous-but-simple). Zero of the 10 explicit bimanual/handover tasks (`grab_roller`, `lift_pot`, `place_bread_basket`, `place_dual_shoes`, `handover_block`, `handover_mic`, `pick_diverse_bottles`, `pick_dual_bottles`, `place_object_basket`, `scan_object`) have ever shown any success. The parent model is a LIBERO (single-arm-only) specialist — plausible mechanism: the frozen/near-frozen backbone can steer existing single-arm motor primitives onto new single-arm tasks via the thin action_encoder/head, but cannot express genuinely novel two-arm coordination without real backbone capacity.
+- **Correction (2026-08-22)**: `research/NOTES.md`'s prior "4 tasks have zero training episodes" claim was independently re-verified and found wrong — all 50 tasks have real, ~uniform data (~550 episodes each; 550×50=27,500=total_episodes exactly). Episode length is also statistically identical between the successful and failing task sets (223.8 vs 220.3 frames mean). See `research/NOTES.md` "CORRECTED (2026-08-22)" and `research/STATE.md`. **The ~12% ceiling is not a data problem** — this is what motivates trying full backbone capacity again, this time protected.
+- **exp0013 history (the direct precedent for this candidate's risk)**: full-backbone training on this same release-checkpoint parent, plain 1:1 mix. RoboTwin capability rose (click_alarmclock 80%, turn_switch 60% at cumulative step 1000) then collapsed (2 of 4 curated tasks to 0% by cumulative step 1800), while LIBERO-Spatial stayed solid throughout and training loss kept falling smoothly (rules out a simple optimization pathology). Two leading hypotheses were never fully distinguished: backbone interference between embodiments, or closed-loop/offline-imitation distribution shift. `exp0014` tested the frozen-backbone response and confirmed freezing stops the decline — but that doesn't tell us whether *protected* full-backbone training would also avoid it.
+
+### Accepted LIBERO retention state
+
+| Suite | Success |
+|---|---:|
+| LIBERO-90 | out of scope, not tracked |
+| LIBERO-Spatial | 96.67% (exp0016 phase-1, n=3) — most recent measurement, on top of exp0014's checkpoint |
+| LIBERO-Object | not re-measured since exp0014's own numbers (99.0%) |
+| LIBERO-Goal | not re-measured since exp0014's own numbers (97.0%) |
+| LIBERO-Long / LIBERO-10 | **87.0% at exp0014 cumulative step 2600 (below the 90% floor)** — driven by 2 specific dual-object mug-placement tasks; not re-measured since, including not at the cumulative-4600 checkpoint this candidate resumes from |
+
+**LIBERO-Long is the single most important number to watch in this run** — it was already below the 90% floor at an earlier point in this exact lineage and has never been re-confirmed. This is the primary reason for the Long-protective data-mixing change (Section 3) and for the frequent early progress-check cadence (Section 3, "initial compute plan").
+
+## 3. Candidate design
+
+### Modifications
+
+1. Resume from `exp0014`'s cumulative-step-4600 checkpoint (current project best; single-arm RoboTwin capability banked).
+2. `trainable_modules` reverts to the default (`"dit"`) — the **entire shared MoT backbone (video + action experts) is trainable**, no freezing, no low-LR split. Matches `exp0013` and the sibling project's always-full-fine-tune approach.
+3. **New data config** (`configs/data/multiembodiment_libero_robotwin_long_protected.yaml`): LIBERO-Long (`libero_10_no_noops_lerobot`) listed 3x in the LIBERO embodiment's `dataset_dirs` (388 → ~1164 episodes, comparable to Object's 457 / Spatial's 434 — brings Long from the smallest LIBERO suite by episode count to the largest). Spatial/Object/Goal stay at 1x — no regression evidence for them yet, so no reason to touch them. RoboTwin stays at its standard 1:1 embodiment-level ratio (unchanged from `exp0013`/`exp0014`) — deliberately *not* combined with a RoboTwin-heavy ratio this round, to avoid confounding "does full-backbone-with-protection avoid the collapse" with a second simultaneous risk factor.
+4. Training budget extended to `max_steps=20000` — but see "initial compute plan" below: this is a ceiling, not a target, given the real collapse risk.
+5. `save_every` tightened to 200 (from exp0013's own 200, kept unchanged — exp0013 already used a reasonably tight cadence; the actual change here is evaluation frequency, see below) to give fine-grained checkpoint selection if a decline is caught mid-run.
+
+### Why this candidate
+
+`exp0013` is the only real prior evidence about what happens when the shared backbone is left fully trainable under this multi-embodiment setup, and it showed a genuine risk (RoboTwin capability rose then partially collapsed). But that run (a) used no LIBERO-protective data mixing at all, despite this project inheriting the sibling project's own well-documented finding that Goal/Long are disproportionately vulnerable to dilution under joint multi-suite training without oversampling, and (b) was stopped and diagnosed relatively early (by cumulative step ~1800-2600), before there was a chance to see whether the decline was a transient "stability gap" (a documented continual-learning phenomenon the sibling project's own literature review flagged, with typical recovery within 6-10% of the original training budget) rather than a permanent regression. Meanwhile, this project's freezing-based workarounds (`exp0002`/`0004`/`0014`/`exp0016`) provably cannot build new bimanual-coordination capacity — today's diagnostic (Section 2) shows the ~12% ceiling correlates cleanly with single-arm vs. bimanual task structure, not data volume or exposure count, which argues for giving the model real capacity rather than more exposure under a fixed-capacity regime. Full-backbone training, done with the same kind of protective data mixing that worked for the sibling project's own analogous problem, is the most direct way to test whether real capacity can close that gap without repeating `exp0013`'s failure mode.
+
+### Multi-embodiment representation/configuration
+
+Unchanged from `exp0011` onward — shared K=21 (action) / K=22 (state), LIBERO at offset 0, RoboTwin at offset 7/8, masked loss, zero-init checkpoint expansion. Re-verified correct end-to-end on this machine (config wiring, encode/decode symmetry, loss masking, checkpoint expansion) before this candidate was designed — see conversation record 2026-08-22; all relevant unit tests pass (`test_action_state_merger_offset.py` 5/5, `test_masked_action_loss.py` 5/5, `test_expand_checkpoint.py` 3/4 — the one failure is a stale pre-`exp0011`-fix test asserting the old, deliberately-reversed random-init behavior, not a real bug in the current code).
+
+### Data and learning strategy
+
+- LIBERO datasets/tasks: Spatial (1x) / Object (1x) / Goal (1x) / Long-10 (**3x**, new) — LIBERO-90 excluded (no lerobot-format data available).
+- RoboTwin datasets/tasks: full 50-task combined preprocessed directory (`data/robotwin2.0/robotwin2.0`) — unchanged, all 50 tasks confirmed present with real, ~uniform data.
+- sampling/mixing ratio: LIBERO ratio=1.0, RoboTwin ratio=1.0 (embodiment-level, unchanged from `exp0013`/`exp0014`) — only the *within-LIBERO* Long weighting changed.
+- per-task/per-dataset weights: Long 3x within LIBERO; nothing else.
+- replay/rehearsal strategy: standard joint per-step mixing (`InterleavedEmbodimentSampler`), unchanged.
+- loss weights: standard masked per-embodiment action loss, unchanged.
+- retention/distillation/regularization: none beyond the disjoint-offset interference-free design and the Long oversampling above.
+- trainable/frozen modules: **full `dit`** (video + action MoT backbone), no freezing, no low-LR split.
+
+### What to watch
+
+Per Design revision 2: track all of the below from early on for visibility, but **do not make a STOP_TRAINING call from an early dip alone** — `exp0013`'s own "collapse" verdict was drawn from under 2000 steps against a ~188k-step epoch, not enough exposure to trust. Only a sustained, worsening, unambiguous failure (or NaN/divergence) over several thousand further steps should trigger an early stop; a transient dip that stabilizes or recovers should not.
+
+- **LIBERO-Long specifically** — already below the 90% floor at an earlier point in this lineage, never re-confirmed, and the entire point of the data-mixing change. Track it at every check; a dip that persists and worsens over thousands of steps is a real concern, a single low reading early on is not conclusive on its own.
+- The same RoboTwin curated 4-task panel `exp0013` used (`click_alarmclock`, `turn_switch`, `press_stapler`, `open_laptop`) — track the same rise/fall pattern `exp0013` showed, but let it play out over a genuinely larger step count before concluding it's the same failure mode rather than a transient dip that recovers (the sibling project's own literature review found regressions in pretrained/converged models typically recover within 6-10% of the training budget — for a 20000-step ceiling that's roughly 1200-2000 steps, well within what this run should actually reach).
+- The bimanual/handover 10-task subset (Section 2) — the sharpest signal for whether real backbone capacity is actually closing the representational gap. Needs real step count to show anything; don't expect movement in the first few thousand steps.
+- LIBERO-Spatial as a cheap, fast sentinel at every check (has stayed solid throughout this project's history so far).
+- Training stability: loss/action_l2 trend, no divergence, no discontinuities at resume — this is the one category where an early, unambiguous problem (NaN, exploding loss) should stop the run immediately regardless of step count.
+
+### Initial compute plan
+
+- initial training budget: `max_steps=20000` (ceiling, not a target — see Design revision 2. Still well under one RoboTwin epoch (~188k steps), but a large step count relative to everything tested in this project so far, deliberately chosen so the run isn't judged on too small a sample the way prior candidates were).
+- checkpoint/save cadence: `save_every=500` (raised from an initial 200 given the larger step ceiling, to keep local disk/HF-upload overhead reasonable at this scale) — still fine-grained enough for checkpoint selection if needed.
+- **progress-check cadence**: light/cheap sanity checks (loss/action_l2 trend, quick LIBERO-Spatial + Long sentinel) every ~500-1000 steps for visibility, but the first real evaluative *decision point* (continue at current settings / extend / stop / select an earlier checkpoint) should not happen before roughly local step 5000 — enough exposure to distinguish a real problem from the kind of transient dip `exp0013` was never given the chance to recover from. Full-50-task RoboTwin rescans are expensive (~9h at n=10 historically) — reserve those for meaningful decision points (e.g. around step 5000, then again near the end of the budget or at a natural stopping point), not every check.
+- expected cost: at this project's measured throughput (~0.0215 steps/s pre-batch-size-tuning), 20000 steps is roughly 10.8 days wall-clock; a batch-size/throughput tuning pass is being run in parallel to shorten this before committing to the full budget.
+
+This is a plan, not a promise to consume the whole budget — will adapt based on progress checks per `$run-fastwam-training`, but will give the run real time to show its actual effect before drawing conclusions, per explicit user direction.
+
+## 4. Exact code and configuration state
+
+- Git commit: TBD
+- Git branch: `autoresearch/robotwin-multiembodiment-v1`
+- parent code commit: `d8353c4` (research-notes correction commit, on top of exp0016's `e0fea9c`)
+- working tree dirty before launch: new data config, new task config, this progress report
+- files changed: `configs/data/multiembodiment_libero_robotwin_long_protected.yaml` (new), `configs/task/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5.yaml` (new), this progress report; also `configs/task/multiembodiment_libero_robotwin_disjoint_offset_release_parent_backbone_low_lr_robotwin_heavy_longrun_3e-5.yaml` (new, queued next candidate, not used by this run)
+- training config: `multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5`
+- LIBERO dataset config: via `multiembodiment_libero_robotwin_long_protected` (Long 3x, others 1x)
+- RoboTwin dataset config: via `multiembodiment_libero_robotwin_long_protected` (unchanged from `multiembodiment_libero_robotwin`, ratio=1.0)
+- action/state normalization: per-dataset (LIBERO min/max, RoboTwin z-score), unchanged
+- action validity-mask configuration: unchanged (K=21/22, offsets 0/0 and 7/8)
+- model/trainable-module configuration: default (`"dit"`, full backbone)
+- optimizer/LR/scheduler: cosine, `learning_rate=3e-5`, `weight_decay=1e-2` — identical to exp0013's
+- batch size/gradient accumulation: `batch_size=3` (raised from this project's historical `2` after an OOM/memory sweep on this machine, 2026-08-22 — `batch_size=4` peaked at ~76.2/80GB, too little headroom for a long run; `batch_size=3` completed cleanly with more margin, extrapolated ~80% GPU memory utilization), `gradient_accumulation_steps=4` (unchanged) — effective global batch rises from 32 to 48
+- initial training steps/budget: `max_steps=20000`
+- checkpoint/save cadence: `save_every=500`
+- resume source/type: weights-only file resume, `./checkpoints/exp0014_resume/research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt`
+
+## 5. Hardware and software environment
+
+Fresh machine rebuild (2026-08-22) — full environment/data re-setup performed this session (venv, LIBERO, RoboTwin/SAPIEN/curobo/pytorch3d, all data/checkpoints re-downloaded). See conversation record for full detail; not re-duplicated here.
+
+### GPU
+
+- GPU count: 4
+- GPU model(s): NVIDIA A100-SXM4-80GB
+- memory per GPU: 80GB
+- NVIDIA driver: 570.211.01
+- CUDA runtime/toolkit: 12.8
+
+### Software
+
+- PyTorch version: 2.7.1+cu128
+- FastWAM repository commit: `d8353c4` (at report creation time)
+- environment: `/workspace/venvs/fastwam` (Python 3.10.21)
+
+## 6-12.
+
+To be filled in as the run progresses, per `$run-fastwam-training`.

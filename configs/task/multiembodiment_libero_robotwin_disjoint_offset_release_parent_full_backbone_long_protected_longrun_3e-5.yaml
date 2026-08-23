@@ -1,0 +1,77 @@
+# @package _global_
+#
+# exp0017 (PROGRESS_0017, revised design): full-backbone fine-tune + LIBERO-Long-
+# protective data mixing + a genuinely long run -- testing whether exp0013's earlier
+# full-backbone collapse (RoboTwin capability rose then fell, 2/4 curated tasks
+# collapsed to 0% by step 1800) was an artifact of an unprotected 1:1 data mix and/or
+# too short a run to see recovery, rather than an inherent property of full-backbone
+# training. This mirrors the sibling LIBERO-only project's own successful playbook
+# (autoresearch/libero90-v1): they always did a full `model.dit` fine-tune (no
+# freezing, no LoRA/adapters -- see `Wan22Trainer._apply_dit_only_train_mode`), and
+# handled forgetting risk entirely through iteratively-tuned data-mix oversampling
+# (Goal 5x-7x, Long 5x-10x) rather than freezing/low-LR backbone tricks. This project
+# jumped to freezing (exp0002/0004/0014) and low-LR backbone plasticity (exp0005/0016)
+# without first trying the sibling project's own actual solution to an analogous
+# forgetting problem.
+#
+# Deliberately run BEFORE the backbone-plasticity candidate (see
+# multiembodiment_libero_robotwin_disjoint_offset_release_parent_backbone_low_lr_robotwin_heavy_longrun_3e-5.yaml,
+# queued as the next candidate if this one shows renewed collapse or doesn't pan out)
+# -- full-backbone plasticity is a strict superset of low-LR partial plasticity in
+# terms of representational capacity available for genuinely new bimanual-coordination
+# behavior, so it is the more informative first test of the "capacity, not data" theory
+# established in PROGRESS_0017's diagnostic section, if it can be done without
+# repeating exp0013's LIBERO/RoboTwin interference collapse.
+#
+# Resumes from exp0014's cumulative-4600 checkpoint (current project best, single-arm
+# RoboTwin capability already banked) rather than the raw release parent exp0013 used
+# -- this is a forward-looking candidate building on the project's actual current
+# state, not a strict controlled ablation against exp0013 (that would require
+# discarding exp0013/0014's already-banked progress; noted explicitly in PROGRESS_0017
+# so the comparison isn't over-interpreted as isolating the mixing variable alone).
+#
+# Data mixing: LIBERO-Long (libero_10) oversampled 3x within the LIBERO embodiment's
+# own mix (see multiembodiment_libero_robotwin_long_protected.yaml) -- directly
+# targets the one concrete LIBERO regression already observed (Long 87.0% at exp0014
+# cumulative step 2600, below the 90% floor, never re-confirmed). RoboTwin stays at
+# its standard 1:1 embodiment-level ratio (unchanged from exp0013/exp0014) -- adding a
+# RoboTwin-heavy ratio on top of full-backbone unfreezing would confound this specific
+# test (full-backbone risk vs. ratio risk, compounding rather than isolating).
+#
+# Given exp0013's real collapse history, this run requires FREQUENT early progress
+# checks (see PROGRESS_0017 "what to watch") -- do not let this run unattended past
+# ~500-step intervals for the first 2000-3000 steps the way exp0013 was.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+# batch_size=3 (raised from 2, this project's historical value) per a batch-size/OOM
+# sweep on this machine (2026-08-22): batch_size=4 peaked at ~76.2/80GB (only ~5%
+# headroom, too risky for a 20000-step run with real data variability), batch_size=3
+# completed cleanly with more margin (extrapolated ~80% utilization vs. batch_size=2's
+# historical ~65-67%). gradient_accumulation_steps left unchanged -> effective global
+# batch rises from 32 to 48.
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+# trainable_modules intentionally omitted -> Trainer default ("dit"): full shared
+# backbone (video + action MoT) trainable, matching exp0013 and the sibling project's
+# always-full-fine-tune approach. No freezing, no low-LR backbone split this time.
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 20000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: ./checkpoints/exp0014_resume/research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt

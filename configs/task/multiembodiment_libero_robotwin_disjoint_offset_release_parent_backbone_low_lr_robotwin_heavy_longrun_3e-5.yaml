@@ -1,0 +1,76 @@
+# @package _global_
+#
+# exp0017 (PROGRESS_0017): combines backbone plasticity (exp0016's
+# `dit_with_backbone_low_lr`) with a RoboTwin-heavy sampling ratio (exp0015's
+# `multiembodiment_libero_robotwin_robotwin_heavy`, 1:3 LIBERO:RoboTwin), run at a
+# genuinely long budget -- a combination never tested before.
+#
+# Motivation (see PROGRESS_0017 for full detail):
+# - Two prior claims that jointly justified stopping/narrowing this line of research
+#   have both been independently re-verified and found WRONG on a fresh machine:
+#   (1) "RoboTwin training data has a real coverage gap (4/50 tasks with zero
+#   episodes)" -- disproven; all 50 tasks have ~550 real episodes each, a uniform
+#   split. (2) exp0014's "the ~12% full-50-task ceiling is a fixed data-coverage
+#   limitation" conclusion built on (1) is therefore also unsupported. Episode length
+#   is also statistically identical between currently-successful and currently-failing
+#   RoboTwin tasks (223.8 vs 220.3 frames mean) -- rules out task/episode complexity
+#   too.
+# - New diagnostic finding: the ~10 currently-successful RoboTwin tasks (under
+#   exp0014's frozen backbone) are overwhelmingly single-arm ("use one arm"); every
+#   explicitly bimanual/handover task (10 of 50) has zero success so far. The parent
+#   model is a LIBERO (single-arm-only) specialist -- this is consistent with a
+#   representational-capacity gap (the frozen backbone can steer existing single-arm
+#   motor primitives onto new single-arm tasks via the thin action_encoder/head, but
+#   cannot express genuinely novel two-arm coordination) rather than a data problem.
+# - exp0015 (RoboTwin-heavy 1:3 ratio) found no effect on the full-50-task mean, but
+#   that test ran under `expanded_projections_only` (the backbone fully frozen) --
+#   with zero backbone capacity to use in the first place, a larger RoboTwin gradient
+#   share had nothing to spend it on. That confound was never isolated: the ratio
+#   question has never been retested under a regime where the backbone can actually
+#   absorb new bimanual-coordination signal.
+# - Every RoboTwin multi-embodiment training result to date (exp0013-0016) has covered
+#   well under 1% of one RoboTwin epoch (~6.01M samples at this project's measured
+#   throughput). No lever has been tested at a scale where a genuine capacity-building
+#   effect could plausibly show up.
+#
+# This candidate tests both open questions together (they share the same enabling
+# mechanism -- backbone plasticity -- so bundling is a coherent, not arbitrary, choice):
+# does more RoboTwin gradient share broaden capability now that the backbone has
+# somewhere to put it, given enough real training time.
+#
+# Resumes from exp0016's last durably-backed-up checkpoint
+# (cheikh025/ASR:research/exp0016_backbone_low_lr/step_001000_cumulative.pt --
+# exp0016's originally-planned 5000-step extension beyond this point was interrupted
+# by a machine reset and its intermediate progress was not durably saved; this is the
+# latest recoverable state). Same backbone_lr=3e-6 / learning_rate=3e-5 as exp0016.
+#
+# Primary evaluation lens (see PROGRESS_0017): track the bimanual/handover task subset
+# specifically (not just the full-50-task mean), since that is the sharpest available
+# signal for whether backbone plasticity is actually closing the capability gap.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_robotwin_heavy
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 2
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+trainable_modules: dit_with_backbone_low_lr
+backbone_lr: 3e-6
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 8000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: false
+
+weight_decay: 1e-2
+resume: ./checkpoints/exp0016_resume/research/exp0016_backbone_low_lr/step_001000_cumulative.pt
