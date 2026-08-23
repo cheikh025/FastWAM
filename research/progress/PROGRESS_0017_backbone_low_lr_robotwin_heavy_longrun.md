@@ -1,9 +1,9 @@
 # PROGRESS_0017 — full_backbone_long_protected_longrun
 
 - **Experiment ID:** 0017
-- **Status:** `PLANNED`
+- **Status:** `RUNNING`
 - **Created:** 2026-08-22
-- **Updated:** 2026-08-22 (revised design — see "Design revision" note below)
+- **Updated:** 2026-08-23 (launched, see Section 6)
 - **Parent experiment:** 0014 (release_parent_frozen_backbone)
 - **Parent checkpoint:** `cheikh025/ASR:research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt` (current project-best checkpoint; single-arm RoboTwin capability banked, LIBERO-Long previously measured at 87.0% — below floor — at an earlier point in this same lineage, cumulative step 2600, never re-confirmed)
 - **Selected candidate checkpoint:** TBD
@@ -88,7 +88,7 @@ Per Design revision 2: track all of the below from early on for visibility, but 
 - initial training budget: `max_steps=20000` (ceiling, not a target — see Design revision 2. Still well under one RoboTwin epoch (~188k steps), but a large step count relative to everything tested in this project so far, deliberately chosen so the run isn't judged on too small a sample the way prior candidates were).
 - checkpoint/save cadence: `save_every=500` (raised from an initial 200 given the larger step ceiling, to keep local disk/HF-upload overhead reasonable at this scale) — still fine-grained enough for checkpoint selection if needed.
 - **progress-check cadence**: light/cheap sanity checks (loss/action_l2 trend, quick LIBERO-Spatial + Long sentinel) every ~500-1000 steps for visibility, but the first real evaluative *decision point* (continue at current settings / extend / stop / select an earlier checkpoint) should not happen before roughly local step 5000 — enough exposure to distinguish a real problem from the kind of transient dip `exp0013` was never given the chance to recover from. Full-50-task RoboTwin rescans are expensive (~9h at n=10 historically) — reserve those for meaningful decision points (e.g. around step 5000, then again near the end of the budget or at a natural stopping point), not every check.
-- expected cost: at this project's measured throughput (~0.0215 steps/s pre-batch-size-tuning), 20000 steps is roughly 10.8 days wall-clock; a batch-size/throughput tuning pass is being run in parallel to shorten this before committing to the full budget.
+- expected cost: **confirmed real throughput at `batch_size=3` on this machine (2026-08-23): ~6.3 sec/step (50 steps in 314s, steady across two independent samples)** — about 7x faster than this project's older pre-batch-size-tuning estimate (~0.0215 steps/s / ~46 sec/step). At this rate: step ~5000 (first real decision point) in ~8.75 hours; the full 20000-step ceiling in ~35 hours (~1.5 days).
 
 This is a plan, not a promise to consume the whole budget — will adapt based on progress checks per `$run-fastwam-training`, but will give the run real time to show its actual effect before drawing conclusions, per explicit user direction.
 
@@ -129,6 +129,28 @@ Fresh machine rebuild (2026-08-22) — full environment/data re-setup performed 
 - FastWAM repository commit: `d8353c4` (at report creation time)
 - environment: `/workspace/venvs/fastwam` (Python 3.10.21)
 
-## 6-12.
+## 6. Training execution and control timeline
 
-To be filled in as the run progresses, per `$run-fastwam-training`.
+- exact launch command: `bash scripts/train_zero1.sh 4 task=multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5 model.redirect_common_files=false`
+- **First launch attempt (2026-08-23 01:41 UTC, run_id `2026-08-23_01-41-12`) — aborted, not a training problem.** Launched with a trailing `| tail -300` on the command; plain `tail` (no `-f`) buffers all input and only prints once the stream closes, so the captured log stayed empty for the run's full duration even though training was healthy underneath (confirmed after the fact: GPU actively computing at ~72-74GB/GPU, matching the `batch_size=3` sweep; reached step 440/20000 at a real, healthy ~6.4 sec/step once the buffered log was inspected). Killed via graceful `SIGTERM` after ~50 minutes once the observability bug was identified — better to lose ~50 minutes of unconfirmed compute than let a multi-day run proceed with no way to catch a real problem. No checkpoint had been saved yet (`save_every=500`, only reached step ~440-450), so nothing was recoverable from this attempt; verified full process/GPU cleanup (no orphans) before relaunching.
+- **Second launch (2026-08-23 02:32 UTC, run_id `2026-08-23_02-32-14`) — the actual run this report tracks.** Same config, resumed from the same `exp0014` checkpoint. Launched without the trailing `tail` this time (raw stdout captured live). Model construction/dataset build took ~5 minutes (much faster than the first attempt's ~40+ minutes, since all caches — ActionDiT backbone, LIBERO/RoboTwin text embeds, base Wan2.2 components — were already warm from the first attempt).
+- start time: 2026-08-23 02:32 UTC
+- **Confirmed real throughput**: ~6.3 sec/step, steady across two independent samples (190 steps @ 6.42s/step from the first attempt before it was killed; 50 steps @ 6.28s/step from the second launch) — about 7x faster than this project's older pre-batch-size-tuning estimate (~46 sec/step). At this rate: step ~5000 in ~8.75 hours, the full 20000-step ceiling in ~35 hours (~1.5 days).
+- number of GPUs/world size: 4
+- early loss trend: 0.4871, 0.4698, 0.6061, 0.9046, 0.4545, 0.4612 (steps 10-60) — normal step-to-step variance for a freshly-resumed mixed-embodiment batch, no divergence.
+- training log: `/tmp/claude-1002/.../tasks/b1wm2zb5j.output` (session-local; not a permanent artifact path — will be copied/summarized into this report at the next real decision point)
+- checkpoint/output dir: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5/2026-08-23_02-32-14/`
+
+### Intermediate checkpoints and progress decisions
+
+| Checkpoint / step | Runtime so far | Eval purpose | RoboTwin evidence | LIBERO retention evidence | Decision | Updated training plan |
+|---|---:|---|---|---|---|---|
+| (none yet — first save at step 500) | ~15 min | — | — | — | — | Training healthy, no action yet |
+
+### Why training ended
+
+Not yet — still running.
+
+## 7-12.
+
+To be filled in at the next real progress-check decision point (~step 5000, per the compute plan) and at final decision time, per `$run-fastwam-training`.
