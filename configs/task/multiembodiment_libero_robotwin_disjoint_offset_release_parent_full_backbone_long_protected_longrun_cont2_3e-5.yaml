@@ -1,0 +1,48 @@
+# @package _global_
+#
+# exp0017 cont2: seamless directory (full-state) resume from cont1's
+# checkpoints/state/step_002500 (cumulative step 5240 = phase-1's 2740 +
+# cont1's local 2500) -- global_step/optimizer/LR-scheduler continue exactly where
+# they left off, no schedule restart this time (unlike phase-1 -> cont1, which had
+# to use a weights-only resume since save_full_state was false then).
+#
+# Launched immediately after Progress check 1 (PROGRESS_0017 Section 6): the RoboTwin
+# curated 4-task panel at this checkpoint showed a real decline matching exp0013's
+# collapse signature (turn_switch 80%->0%, click_alarmclock 100%->20%, press_stapler
+# 100%->20%) while LIBERO stayed healthy (Spatial 94%, Long 90%, both above floor).
+# Per the compute plan's patience policy this is not yet grounds for STOP_TRAINING
+# (one measurement, could still be a transient stability-gap dip) -- max_steps set so
+# the NEXT RoboTwin check lands around cumulative step 6500-7000 (roughly 1000-1500
+# more steps), much sooner than the original ~5000-step gap, specifically to determine
+# whether this is worsening, flat, or recovering before any stop/continue decision.
+#
+# max_steps=17000 keeps this config's own eventual ceiling consistent with cont1's
+# reduced 17500 (cont1 already completed 2500 of that), so total budget across all
+# three phases stays ~20000. Not expected to be exhausted before the next progress
+# check triggers a real decision.
+#
+# Everything else unchanged from cont1/the original exp0017 design.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 17000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont1_3e-5/2026-08-23_21-35-06/checkpoints/state/step_002500

@@ -141,16 +141,40 @@ Fresh machine rebuild (2026-08-22) — full environment/data re-setup performed 
 - training log: `/tmp/claude-1002/.../tasks/b1wm2zb5j.output` (session-local; not a permanent artifact path — will be copied/summarized into this report at the next real decision point)
 - checkpoint/output dir: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_3e-5/2026-08-23_02-32-14/`
 
-### Intermediate checkpoints and progress decisions
+### Unplanned interruption and cont1 (2026-08-23 ~07:27 UTC)
 
-| Checkpoint / step | Runtime so far | Eval purpose | RoboTwin evidence | LIBERO retention evidence | Decision | Updated training plan |
-|---|---:|---|---|---|---|---|
-| (none yet — first save at step 500) | ~15 min | — | — | — | — | Training healthy, no action yet |
+Instance was stopped/restarted mid-run at logged step 2740/20000 (last durable checkpoint: `step_002500.pt`, phase-1 dir). Not a destructive recycle — `/workspace` (venv, checkpoints, git state) survived intact. `save_full_state` was `false` on the original launch, so resuming from the weights-only file necessarily reset `global_step`/optimizer/LR-scheduler to 0 (confirmed in `trainer.py::_resume_or_load_checkpoint`: file resume does not restore these, by design — not a bug). Relaunched as **cont1** (`multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont1_3e-5.yaml`): resumed weights from phase-1's `step_002500.pt`, `max_steps` reduced 20000→17500 (keeps total cumulative budget ~20000 across both phases), **`save_full_state` flipped to `true`** so a future interruption can resume seamlessly. Cumulative step bookkeeping from here: phase-1's 2740 + cont1's own step count.
 
-### Why training ended
+**Operational lesson (checkpoint-save race condition)**: when stopping training for a progress-check eval, do not `SIGTERM` immediately upon seeing a `step=N` log line — the step counter can print before or concurrent with the checkpoint write completing. Killed the process at the exact moment `step=3000`'s log line printed and caught the save mid-write, producing a corrupted 313KB file instead of the full ~12GB checkpoint (confirmed via `file` command: valid zip header but truncated). Recovered by discarding the corrupt file and using the previous confirmed-complete checkpoint (`step_002500.pt`, cont1-local) instead. **Going forward: wait for filesystem evidence the save fully landed (e.g. poll file size/mtime stability, or wait past the next log line) before sending `SIGTERM`, not just the log line announcing the step number.**
 
-Not yet — still running.
+### Progress check 1 — cumulative step 5240 (phase-1's 2740 + cont1's local step 2500), 2026-08-24
+
+**Purpose**: `progress_check` per the compute plan (first real decision point, originally targeted ~step 5000; landed at 5240 due to the checkpoint-save-race delay above).
+
+**LIBERO sentinel** (`libero_uncond_2cam224_multiembodiment_eval`, n=5/task, both suites):
+
+| Suite | Success | vs. floor |
+|---|---:|---|
+| LIBERO-Spatial | **94.00%** (47/50) | comfortably clears 90% |
+| LIBERO-Long | **90.00%** (45/50) | exactly at the 90% floor — but a real recovery from `exp0014`'s 87.0% (below floor) at the equivalent point in the parent lineage |
+
+Raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260824_031545/`. **The Long-protective 3x oversampling appears to be working** — no sign of the regression that motivated it.
+
+**RoboTwin curated 4-task panel** (`click_alarmclock`, `turn_switch`, `press_stapler`, `open_laptop`; n=5/task, Clean + Randomized): raw results `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont1_3e-5_2026-08-23_21-35-06/20260824_032959/`.
+
+| Task | Clean | Random | Parent (`exp0014` cumulative 4600) |
+|---|---:|---:|---:|
+| click_alarmclock | 20% | 40% | 100% |
+| turn_switch | **0%** | **0%** | 80% |
+| press_stapler | 20% | 20% | 100% |
+| open_laptop | 40% | 40% | 40% |
+
+**This is the same collapse signature `exp0013` showed** (`turn_switch`→0% was flagged in this candidate's own design as the clearest early collapse signal to watch for) — a real, large decline across 3 of 4 previously-strong tasks, happening within only ~640 steps of full-backbone training from the `exp0014` resume point. Unlike `exp0013`, this run has no earlier RoboTwin measurement between the parent checkpoint and this one, so whether capability first rose and is now falling (matching `exp0013`'s exact rise-then-fall shape) or declined monotonically from the start of this phase is unknown — a gap in the evidence, noted for future runs (check RoboTwin closer to a full-backbone resume point, not only at the ~5000-step mark).
+
+**Decision: `CONTINUE_TRAINING`, not `STOP_TRAINING`.** Per the compute plan's explicit patience policy (do not stop on an early/isolated dip; regressions in pretrained models often recover within 6-10% of the training budget, which is still ahead of this phase), one measurement at step 5240 is not sufficient to distinguish a transient dip from a repeat of `exp0013`'s permanent collapse. However, given the magnitude and the exact pattern match to the known failure mode, **the next RoboTwin check must happen much sooner than another ~5000-step gap** — planned around cumulative step 6500-7000 (roughly 1000-1500 more steps), specifically to determine whether this is worsening (real collapse, matching `exp0013` — likely `STOP_TRAINING` and fall back to the queued backbone-plasticity candidate), flat (inconclusive, needs another check), or recovering (transient stability gap, as the literature review anticipated — continue toward the full budget).
+
+Resumed via a proper directory (full-state) resume from `checkpoints/state/step_002500` this time — global_step/optimizer/LR-scheduler continue seamlessly, no further schedule disruption.
 
 ## 7-12.
 
-To be filled in at the next real progress-check decision point (~step 5000, per the compute plan) and at final decision time, per `$run-fastwam-training`.
+To be filled in at the next progress-check decision point (~cumulative step 6500-7000) and at final decision time, per `$run-fastwam-training`.
