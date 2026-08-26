@@ -175,6 +175,34 @@ Raw results: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval
 
 Resumed via a proper directory (full-state) resume from `checkpoints/state/step_002500` this time — global_step/optimizer/LR-scheduler continue seamlessly, no further schedule disruption.
 
+### Disk-full crash and cont2 recovery (2026-08-24 13:44 UTC — 2026-08-26)
+
+cont2 ran unattended past the planned ~6500-7000 check (reached local step 8000/17000 = cumulative ~10,740) before crashing at 13:44:20 UTC on a checkpoint save: `RuntimeError: [enforce fail at inline_container.cc:857]. PytorchStreamWriter failed writing file data/2: file write failed` — the disk had filled to 100% from accumulated, unpruned full-state checkpoints (`save_full_state=true`, ~90GB each, saved every 500 steps with nothing deleting older ones). Confirmed via process-start timestamps (`supervisord`/`jupyter-notebook` still showed the Aug-23 restart time, unchanged) that this was **not** another machine restart — the container stayed up throughout; this was a pure disk-space/application crash.
+
+**This went uncaught for approximately two days** (a real monitoring gap — periodic check-in notifications queued without being processed with real investigation in between). Recovery, once caught:
+- The crash's own checkpoint (`step_008000`) turned out **partially corrupted**: the weights-only `step_008000.pt` (12,041,907,845 bytes) is complete and intact, but its paired full-state directory is missing `trainer_state.json` and one of four DeepSpeed rank optimizer-state shards (rank 0) — unrecoverable for a directory resume. Discarded the state dir; using the weights-only file instead.
+- Freed disk (100% full → 957GB free) by deleting 10 redundant superseded checkpoints plus the now-dead `exp0014_resume` (12GB, superseded, not referenced by any live config — `exp0016_resume` kept, it's the queued fallback candidate's actual resume source).
+- **Built and deployed a persistent watchdog** (`/workspace/setup_logs/checkpoint_watchdog.sh`, running independently of any interactive session) that every 5 minutes prunes each run's checkpoints to the 2 most recent weights-only files (cheap, ~12GB each, kept as redundancy in case the single newest is corrupted — exactly what just happened) and the 1 most recent full-state directory (expensive, ~90GB; only needed for a seamless resume, and a weights-only resume is a proven-working fallback), and auto-`SIGTERM`s training if free space ever drops below 100GB. This directly fixes the root cause independent of active monitoring.
+
+### Progress check 2 — cumulative step ~10,740 (phase-1's 2740 + cont2's local step 8000), 2026-08-26
+
+**LIBERO sentinel** (n=5/task): **Spatial 96.00% (48/50), Long 94.00% (47/50)** — both improved slightly from check 1 (94%/90%), comfortably clear the floor. No LIBERO concern.
+
+**RoboTwin curated 4-task panel, Clean phase only** (Randomized phase deliberately skipped this round per explicit direction — halves eval cost, Clean-only is sufficient for this decision):
+
+| Task | Step 5240 (check 1) | Step ~10,740 (check 2) | Trend |
+|---|---:|---:|---|
+| click_alarmclock | 20% | **40%** | recovering |
+| turn_switch | 0% | **0%** | still stuck |
+| press_stapler | 20% | **40%** | recovering |
+| open_laptop | 40% | **40%** | flat |
+
+Raw results: `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont2_3e-5_2026-08-24_04-05-27/20260826_175552/`.
+
+**Interpretation**: 3 of 4 tasks are recovering or holding flat, none are worsening — this looks more like the anticipated transient stability-gap dip than a repeat of `exp0013`'s permanent collapse. `turn_switch` specifically has now read 0% at two consecutive checks (5240 and ~10,740) — a real, specific holdout worth tracking on its own, distinct from the broader (recovering) pattern.
+
+**Decision: `CONTINUE_TRAINING`.** No worsening signal, LIBERO fully healthy, and the recovery direction on 2/4 tasks supports giving the run more time per the patience policy. Resuming as **cont3** — weights-only resume from `step_008000.pt` (the corrupted state dir forces another schedule restart; LR was at 1.78e-05 at the crash, roughly 47% through cont2's own 17000-step schedule, so this restart is a bigger disruption than the near-peak phase-1→cont1 transition — a real cost of the disk-full incident, now mitigated going forward by the watchdog protecting future full-state saves). `max_steps` set to keep the cumulative ceiling near the original ~20000. Next check planned after another substantial step count, specifically watching whether `turn_switch` ever moves off 0%.
+
 ## 7-12.
 
-To be filled in at the next progress-check decision point (~cumulative step 6500-7000) and at final decision time, per `$run-fastwam-training`.
+To be filled in at the next progress-check decision point and at final decision time, per `$run-fastwam-training`.

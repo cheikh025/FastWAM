@@ -1,0 +1,39 @@
+# @package _global_
+#
+# exp0017 cont3: resume after the 2026-08-24 disk-full crash (see PROGRESS_0017
+# "Disk-full crash and cont2 recovery"). cont2's own full-state checkpoint at
+# step_008000 was partially corrupted (missing trainer_state.json and one of four
+# DeepSpeed rank optimizer shards) -- unrecoverable for directory resume. Using the
+# confirmed-complete weights-only step_008000.pt instead (another LR-schedule
+# restart, unavoidable this time; the checkpoint watchdog now protects future
+# full-state saves from the same fate).
+#
+# max_steps=9000 keeps the total cumulative budget near the original ~20000
+# (phase-1's 2740 + cont2's 8000 + this phase's up-to-9000 ~= 19740).
+#
+# Everything else unchanged (data mixing, full backbone, LR, batch_size).
+# save_full_state stays true -- now safe under watchdog protection.
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 9000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont2_3e-5/2026-08-24_04-05-27/checkpoints/weights/step_008000.pt
