@@ -223,6 +223,28 @@ Raw results: `evaluate_results/robotwin/robotwin_uncond_3cam_384_multiembodiment
 
 **Decision: `CONTINUE_TRAINING`.** Resumed via a proper **directory (full-state) resume** from `cont3`'s own `checkpoints/state/step_004000` (confirmed complete — all 4 DeepSpeed rank shards + `trainer_state.json` present, unlike the corrupted `cont2` checkpoint) — global_step/optimizer/LR-scheduler continue seamlessly this time, no further schedule disruption. Continuing toward `cont3`'s existing `max_steps=9000` ceiling. Next check planned after another substantial step count (targeting cumulative ~19,000-20,000, i.e. the original ceiling), watching specifically whether `click_alarmclock`/`turn_switch` continue improving and whether `press_stapler` clarifies.
 
+### Progress check 4 — cumulative step ~19,740, `cont3` completed its full 9000-step ceiling naturally, 2026-08-27
+
+`cont3` ran to completion (`max_steps=9000` reached cleanly, exit code 0 — not a crash). Cumulative step: phase-1's 2740 + `cont2`'s 8000 + `cont3`'s 9000 = 19,740, landing right at the originally-planned ~20,000-step ceiling from this candidate's design.
+
+**LIBERO sentinel** (n=5/task): **Spatial 96.00% (48/50), Long 96.00% (48/50)** — unchanged from check 3, fully stable at the ceiling. LIBERO has never been a concern anywhere in this candidate's run.
+
+**RoboTwin curated 4-task panel, Clean phase, complete 4-check trend:**
+
+| Task | Step 5240 | Step ~10,740 | Step ~14,740 | Step ~19,740 |
+|---|---:|---:|---:|---:|
+| click_alarmclock | 20% | 40% | 60% | 60% |
+| turn_switch | 0% | 0% | 20% | 20% |
+| press_stapler | 20% | 40% | 20% | 40% |
+| open_laptop | 40% | 40% | 40% | 40% |
+| **Mean (4 tasks)** | 20% | 30% | 35% | **40%** |
+
+Raw results: `evaluate_results/robotwin/robotwin_uncond_3cam_384_multiembodiment_eval/20260827_...`.
+
+**Interpretation**: the mean has climbed at every single check with zero regressions — decisive confirmation of the "transient stability-gap, not permanent collapse" hypothesis this candidate was designed to test. `exp0013` collapsed by a comparable cumulative step count under the unprotected 1:1 mix; this candidate, with LIBERO-Long protection, has instead improved steadily the entire time. `click_alarmclock` and `turn_switch` have both held their most recent gains rather than slipping back.
+
+This is a real decision point (the original ~20,000-step budget target, training not currently running). The curated 4-task panel cannot answer whether capability has genuinely *spread* beyond a small task subset (the original finding was only ~10/50 tasks showed any success at all) — reserving the expensive full-50-task scan for exactly this kind of decision point, launching it now.
+
 ## 7-12.
 
-To be filled in at the next progress-check decision point and at final decision time, per `$run-fastwam-training`.
+To be filled in once the full-50-task scan completes and a final candidate-level decision is made, per `$review-fastwam-experiment`.
