@@ -245,6 +245,18 @@ Raw results: `evaluate_results/robotwin/robotwin_uncond_3cam_384_multiembodiment
 
 This is a real decision point (the original ~20,000-step budget target, training not currently running). The curated 4-task panel cannot answer whether capability has genuinely *spread* beyond a small task subset (the original finding was only ~10/50 tasks showed any success at all) — reserving the expensive full-50-task scan for exactly this kind of decision point, launching it now.
 
+### Full 50-task RoboTwin Clean scan — cumulative step ~19,740, 2026-08-27
+
+Command: `run_robotwin_manager.py` with no task filter, `EVALUATION.eval_num_episodes=5 +EVALUATION.clean_only=true MULTIRUN.num_gpus=4 MULTIRUN.max_tasks_per_gpu=1`. Raw results: `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont3_3e-5_2026-08-27_02-13-41/20260827_113926/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.232` (23.2%)** — nearly double `exp0014`'s frozen-backbone full-50-task ceiling (11.6-12.6%, PROGRESS_0014 Section 14). **23 of 50 tasks show nonzero success** (up from ~10-11/50 under every frozen-backbone candidate in this project's history) — capability has genuinely spread, not just deepened on the same narrow set.
+
+**Decisive finding — bimanual/handover breakthrough.** Cross-checked against the 10-task bimanual/handover list that showed zero success under every frozen-backbone experiment in this project (Section 2's diagnostic): **3 of those 10 now show real success** — `handover_mic` 40%, `pick_diverse_bottles` 40%, `place_bread_basket` 20%. This directly confirms the capacity hypothesis this candidate was designed to test: a frozen backbone structurally cannot build new bimanual coordination regardless of training duration; full-backbone plasticity can and does.
+
+Full per-task table (Clean): `shake_bottle` 100%, `shake_bottle_horizontally` 100%, `click_alarmclock` 80%, `dump_bin_bigbin` 80%, `place_container_plate` 80%, `place_burger_fries` 80%, `click_bell` 60%, `move_playingcard_away` 60%, `open_microwave` 60%, `place_object_stand` 60%, `adjust_bottle` 40%, `handover_mic` 40%, `open_laptop` 40%, `pick_diverse_bottles` 40%, `place_cans_plasticbox` 40%, `move_pillbottle_pad` 40%, `press_stapler` 40%, `place_bread_basket` 20%, `place_object_scale` 20%, `place_shoe` 20%, `stack_blocks_two` 20%, `stack_bowls_two` 20%, `turn_switch` 20% (matches the curated-panel measurement at this same checkpoint — consistency check passed); remaining 27 tasks at 0%.
+
+**Decision: `CONTINUE_TRAINING`, unambiguously.** No plateau across 4 consecutive checks (mean 20%→30%→35%→40% on the curated panel; now 23.2% on the actual full-50-task promotion metric), LIBERO fully stable throughout (Spatial/Long both 96%), and today's result is the strongest evidence yet against the queued plasticity-fallback candidate being necessary — full-backbone training is doing exactly what it was hypothesized to do. Extending the training budget beyond the original ~20,000-step ceiling given the continued positive trend with no sign of diminishing returns.
+
 ## 7-12.
 
-To be filled in once the full-50-task scan completes and a final candidate-level decision is made, per `$review-fastwam-experiment`.
+To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
