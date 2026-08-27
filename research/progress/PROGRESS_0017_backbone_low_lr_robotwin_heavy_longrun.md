@@ -203,6 +203,26 @@ Raw results: `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint
 
 **Decision: `CONTINUE_TRAINING`.** No worsening signal, LIBERO fully healthy, and the recovery direction on 2/4 tasks supports giving the run more time per the patience policy. Resuming as **cont3** — weights-only resume from `step_008000.pt` (the corrupted state dir forces another schedule restart; LR was at 1.78e-05 at the crash, roughly 47% through cont2's own 17000-step schedule, so this restart is a bigger disruption than the near-peak phase-1→cont1 transition — a real cost of the disk-full incident, now mitigated going forward by the watchdog protecting future full-state saves). `max_steps` set to keep the cumulative ceiling near the original ~20000. Next check planned after another substantial step count, specifically watching whether `turn_switch` ever moves off 0%.
 
+### Progress check 3 — cumulative step ~14,740 (phase-1's 2740 + cont2's 8000 + cont3's local step 4000), 2026-08-27
+
+**LIBERO sentinel** (n=5/task): **Spatial 96.00% (48/50), Long 96.00% (48/50)** — Long has now improved at every single check (90%→94%→96%), comfortably clear of the floor. LIBERO is not a concern at any point in this candidate's history so far.
+
+**RoboTwin curated 4-task panel, Clean phase, full trend across all three checks:**
+
+| Task | Step 5240 | Step ~10,740 | Step ~14,740 | Trend |
+|---|---:|---:|---:|---|
+| click_alarmclock | 20% | 40% | **60%** | steadily climbing |
+| turn_switch | 0% | 0% | **20%** | **finally moved off zero** |
+| press_stapler | 20% | 40% | 20% | noisy (n=5), no clear direction |
+| open_laptop | 40% | 40% | 40% | flat |
+| **Mean (4 tasks)** | 20% | 30% | **35%** | climbing |
+
+Raw results: `evaluate_results/robotwin/robotwin_uncond_3cam_384_multiembodiment_eval/20260827_015509/`.
+
+**Interpretation**: this is real, positive evidence for the "transient stability-gap dip, not permanent collapse" hypothesis. `click_alarmclock` has improved at every check without exception; `turn_switch` — the specific holdout flagged after checks 1 and 2 — finally showed life. Combined with LIBERO not just holding but actively improving, there is no basis for `STOP_TRAINING` or falling back to the queued plasticity candidate at this point. `press_stapler`'s dip from 40%→20% is within plausible n=5 noise (a single trial flipping) and not treated as a contrary signal on its own.
+
+**Decision: `CONTINUE_TRAINING`.** Resumed via a proper **directory (full-state) resume** from `cont3`'s own `checkpoints/state/step_004000` (confirmed complete — all 4 DeepSpeed rank shards + `trainer_state.json` present, unlike the corrupted `cont2` checkpoint) — global_step/optimizer/LR-scheduler continue seamlessly this time, no further schedule disruption. Continuing toward `cont3`'s existing `max_steps=9000` ceiling. Next check planned after another substantial step count (targeting cumulative ~19,000-20,000, i.e. the original ceiling), watching specifically whether `click_alarmclock`/`turn_switch` continue improving and whether `press_stapler` clarifies.
+
 ## 7-12.
 
 To be filled in at the next progress-check decision point and at final decision time, per `$run-fastwam-training`.
