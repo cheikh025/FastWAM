@@ -1,0 +1,47 @@
+# @package _global_
+#
+# exp0017 cont4: extending training beyond the original ~20000-step ceiling given
+# the decisive, unplateaued positive trend confirmed at cont3's completion
+# (cumulative step ~19,740): full-50-task RoboTwin Clean mean 23.2% (vs exp0014's
+# frozen-backbone ceiling of 11.6-12.6%), 23/50 tasks with nonzero success (vs
+# ~10-11/50), and -- the key finding -- 3 of the 10 bimanual/handover tasks that
+# showed zero success under every frozen-backbone experiment in this project's
+# history now work (handover_mic 40%, pick_diverse_bottles 40%, place_bread_basket
+# 20%). LIBERO fully stable throughout (Spatial/Long both 96%). No basis to stop or
+# fall back to the plasticity candidate -- full-backbone + Long-protected mixing is
+# doing exactly what it was hypothesized to do.
+#
+# max_steps=20000 (this phase's own schedule) resumed via directory (full-state)
+# resume from cont3's own step_009000 (global_step=9000) -- this is precisely the
+# "extend max_steps on directory resume" scenario the project's own foundational fix
+# (commit b2b49d0, `_resync_scheduler_to_global_step`) was built to handle correctly:
+# the scheduler rebuilds for the new, larger max_steps and fast-forwards to
+# global_step=9000 (45% through the new schedule), reopening the LR to continue
+# exploring rather than staying decayed near-zero from cont3's own now-completed
+# schedule.
+#
+# Everything else unchanged (data mixing, full backbone, LR, batch_size).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 20000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont3_3e-5/2026-08-27_02-13-41/checkpoints/state/step_009000
