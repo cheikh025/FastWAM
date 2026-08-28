@@ -257,6 +257,24 @@ Full per-task table (Clean): `shake_bottle` 100%, `shake_bottle_horizontally` 10
 
 **Decision: `CONTINUE_TRAINING`, unambiguously.** No plateau across 4 consecutive checks (mean 20%→30%→35%→40% on the curated panel; now 23.2% on the actual full-50-task promotion metric), LIBERO fully stable throughout (Spatial/Long both 96%), and today's result is the strongest evidence yet against the queued plasticity-fallback candidate being necessary — full-backbone training is doing exactly what it was hypothesized to do. Extending the training budget beyond the original ~20,000-step ceiling given the continued positive trend with no sign of diminishing returns.
 
+### cont4 — cumulative step ~30,740, `cont4` completed its own 20,000-step ceiling naturally, 2026-08-28
+
+`cont4` (directory/full-state resume from `cont3`'s `step_009000`, `max_steps` extended 9000→20000) ran to completion cleanly (exit code 0, final checkpoint `step_020000.pt`, ~12GB, intact). Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont4`'s own 20000 = 30,740 — roughly 11,000 more steps than the previous check.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock 60%, turn_switch **0%** (down from 20% at the prior two checks — single-task n=5 noise, not a broad signal), press_stapler 40%, open_laptop 80%. **Mean 45%** — continues the unbroken 5-check climb (20→30→35→40→45%).
+
+**Full 50-task RoboTwin Clean scan** (`EVALUATION.eval_num_episodes=5 +EVALUATION.clean_only=true`, no task filter): raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont4_3e-5_2026-08-27_13-28-52/20260828_091224/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.328` (32.8%)** — up from 23.2% at the previous checkpoint (+9.6 points over ~11,000 more steps), still no sign of plateauing. **36 of 50 tasks now show nonzero success** (up from 23/50).
+
+**Decisive finding — bimanual/handover capability continuing to spread.** Of the 10 bimanual/handover tasks that showed zero success under every frozen-backbone experiment in this project's history: **8 of 10 now show real success** (up from 3/10 at the prior check) — `handover_mic` 80% (was 40%), `pick_dual_bottles` 40% (new), `place_bread_basket` 40% (was 20%), `place_object_basket` 20% (new), `pick_diverse_bottles` 20% (was 40% — single-task dip, n=5), `lift_pot` 20% (new), `grab_roller` 20% (new), `scan_object` 20% (new). Only `place_dual_shoes` and `handover_block` remain stuck at 0%. This is the strongest evidence yet that full-backbone plasticity is closing the exact capability gap this candidate was designed to close, and it is still accelerating rather than saturating.
+
+Other movement: `move_pillbottle_pad` regressed 40%→0% (one task, not a pattern — every other previously-nonzero single-arm task held or improved: `click_alarmclock` 80%, `open_laptop` 80%, `dump_bin_bigbin` 60%, `click_bell` 60%, `open_microwave` 60%, `move_playingcard_away` 80%, `place_container_plate` 100%, `shake_bottle`/`shake_bottle_horizontally` both 100%). New nonzero tasks beyond the bimanual set: `beat_block_hammer` 80%, `adjust_bottle` 80%, `place_bread_skillet` 80%, `place_burger_fries` 60%, several others at 20-40%.
+
+**LIBERO sentinel** (n=5/task): **Spatial 94.00% (47/50), Long 96.00% (48/50)**. Spatial down slightly from 96.00% at the prior check (a single trial's worth of noise at n=5), Long unchanged. Both comfortably clear the 90% floor — LIBERO retention remains a non-issue throughout this candidate's entire run. Raw: `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260828_105447/`.
+
+**Decision: `CONTINUE_TRAINING`.** Five consecutive checks, zero plateau, zero LIBERO risk, and the bimanual-capability spread (3/10 → 8/10) is accelerating, not saturating. No basis to stop. Extending again.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.

@@ -1,6 +1,6 @@
 # Current Research State
 
-Status: `RESEARCH_LOOP_ACTIVE — PARENT CHECKPOINT SWITCHED (exp0011): exp0019 replaced by the official FastWAM LIBERO release checkpoint after exp0019 was found to be seed-sensitive/fragile specifically on LIBERO-Spatial (see PROGRESS_0011). Establishing a release-checkpoint baseline (exp0012) before the first real multi-embodiment training candidate on the new parent.`
+Status: `RESEARCH_LOOP_ACTIVE — exp0017 (full-backbone + LIBERO-Long-protected mixing) is the current best candidate, actively training past its 5th consecutive progress check. Full 50-task RoboTwin Clean mean has climbed unplateaued across every check: 12.6% (exp0014 frozen-backbone ceiling, for reference) -> 23.2% (cumulative step ~19,740) -> 32.8% (cumulative step ~30,740, latest). LIBERO-Spatial/Long stable at 94-96% throughout, comfortably above the 90% floor. See PROGRESS_0017 for full detail; this line supersedes the exp0011/exp0012 baseline-establishment status below (kept for history).`
 
 ## Parent checkpoint (current, since exp0011)
 
@@ -83,7 +83,24 @@ Spatial/Object/Goal all comfortably clear 90%, but **LIBERO-Long is at 87.0%**, 
 
 Current best checkpoint: exp0014 cumulative step 4600 (`cheikh025/ASR:research/exp0014_release_parent_frozen_backbone/step_004600_cumulative.pt`) -- strongest LIBERO-Spatial (100%) and curated-panel RoboTwin numbers, but the full-50-task mean (11.6%) is the honest metric against the actual project goal, still far below 90%.
 
-### exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`) -- IN PROGRESS, currently training an extension
+### exp0017 (full backbone, LIBERO-Long-protected mixing, resumed from exp0014 cumulative-4600) -- CURRENT BEST CANDIDATE, actively training
+
+Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approaches, all of which plateaued 9.6-12.6% and are now superseded by this line) and added 3x oversampling of LIBERO-Long specifically, to test whether real backbone capacity can build genuine bimanual/handover coordination -- something a frozen backbone structurally cannot do -- without repeating exp0013's unprotected-mix collapse. Full detail and complete progress-check trail: `research/progress/PROGRESS_0017_backbone_low_lr_robotwin_heavy_longrun.md`.
+
+**Full-50-task RoboTwin Clean mean, both measurements taken so far**:
+
+| Cumulative step | Clean mean | Nonzero tasks | Bimanual tasks nonzero (of 10) |
+|---:|---:|---:|---:|
+| 19,740 | 23.2% | 23/50 | 3/10 |
+| 30,740 (latest) | **32.8%** | 36/50 | **8/10** |
+
+Climbing at every single check (curated-panel proxy: 20%->30%->35%->40%->45% across 5 checks), zero plateau, zero LIBERO regression. The bimanual-coordination spread (3/10 -> 8/10 tasks) is the decisive finding -- direct confirmation that full-backbone plasticity, not more exposure under a frozen backbone, is the lever that matters. Only `place_dual_shoes` and `handover_block` remain at 0% among the 10 bimanual tasks.
+
+**LIBERO retention, same two checkpoints**: Spatial 96.00%->94.00%, Long 96.00%->96.00% -- both comfortably above the 90% floor throughout, never at risk. **Note**: only Spatial and Long are tracked at every progress check (the cheap sentinel pair); Object and Goal have not been re-measured since exp0014 (99.0%/97.0% at that point) -- a real evidence gap to close before any promotion decision, per the project's own five-suite rule.
+
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont4_3e-5/2026-08-27_13-28-52/checkpoints/weights/step_020000.pt` (cumulative step 30,740; not yet durably backed up to `cheikh025/ASR` -- do before any further disk pressure).
+
+### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 
 Tests the recommended next lever above: shared backbone stays trainable but at `backbone_lr=3e-6` (10x below the `3e-5` projection LR), resumed from exp0014's cumulative-4600 checkpoint, standard 1:1 LIBERO:RoboTwin ratio (exp0015 already ruled out ratio as the lever).
 
