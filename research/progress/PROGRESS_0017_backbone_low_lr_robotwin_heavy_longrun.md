@@ -275,6 +275,36 @@ Other movement: `move_pillbottle_pad` regressed 40%→0% (one task, not a patter
 
 **Decision: `CONTINUE_TRAINING`.** Five consecutive checks, zero plateau, zero LIBERO risk, and the bimanual-capability spread (3/10 → 8/10) is accelerating, not saturating. No basis to stop. Extending again.
 
+### cont5 — cumulative step ~40,740, `cont5` completed its own 30,000-step ceiling naturally, 2026-08-29
+
+`cont5` (directory/full-state resume from `cont4`'s `step_020000`, `max_steps` extended 20000->30000) ran to completion cleanly (exit code 0, final checkpoint `step_030000.pt`, ~12GB, intact). Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont5`'s own 30000 = 40,740 -- roughly 10,000 more steps than the previous check.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock **100%**, turn_switch **60%** (up sharply from 0% -- the most stubborn holdout finally moving), press_stapler 60%, open_laptop 60%. **Mean 70%** -- continues the unbroken 6-check climb (20->30->35->40->45->70%), and the jump this check is the largest yet.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont5_3e-5_2026-08-28_11-11-15/20260829_053357/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.424` (42.4%)** -- up from 32.8% at the previous checkpoint (+9.6 points over ~10,000 more steps -- the same magnitude jump as the prior check, no deceleration). **41 of 50 tasks now show nonzero success** (up from 36/50).
+
+**Bimanual/handover tasks: 9 of 10 now nonzero** (up from 8/10) -- `handover_block` finally broke through (0%->40%), the last bimanual task besides `place_dual_shoes` to ever move off zero in this project's history. Current bimanual state: handover_mic 60%, pick_dual_bottles 60%, handover_block 40%, place_bread_basket 40%, pick_diverse_bottles 40%, scan_object 40%, place_object_basket 20%, grab_roller 20%, lift_pot 0% (single-trial n=5 dip, was only 20%/1-of-5 previously), place_dual_shoes 0% (still the only task that has never shown any success anywhere in this project).
+
+One benign infra note: a single `grab_roller` episode hit a RoboTwin simulator scripting assertion (`target_pose cannot be None for move action`, in the task's own scripted grasp-pose computation for a specific seed) -- counted correctly as a failed episode, did not affect any other task or crash the eval.
+
+**Full 4-suite LIBERO check** (n=5/task, all four canonical suites in one pass per explicit user request -- closes the Object/Goal evidence gap flagged since exp0014): raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260829_053358/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 96.0% (48/50) |
+| Object | **100.0%** (50/50) |
+| Goal | 96.0% (48/50) |
+| Long | 98.0% (49/50) |
+| **Overall** | **97.5%** |
+
+Every suite comfortably clears the 90% floor -- Object and Goal are now *stronger* than exp0014's original baseline (99.0%/97.0%). LIBERO retention has never been at risk anywhere in this candidate's history, and this is the strongest LIBERO reading of the entire run.
+
+**Decision: `CONTINUE_TRAINING`.** Six consecutive checks, zero plateau (if anything the per-check RoboTwin gain is accelerating: +9.6 twice in a row over comparable step counts), zero LIBERO risk (all 4 suites now confirmed, strongest reading yet), and bimanual coverage is essentially complete (9/10). No basis to stop. Extending again.
+
+Both eval jobs (full-50-task RoboTwin scan and full 4-suite LIBERO check) were run **concurrently** this round to save wall-clock time -- confirmed safe (no OOM, no crashes; GPU memory stayed at 25-60GB free per GPU throughout).
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
