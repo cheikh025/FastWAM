@@ -93,13 +93,16 @@ Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approache
 |---:|---:|---:|---:|
 | 19,740 | 23.2% | 23/50 | 3/10 |
 | 30,740 | 32.8% | 36/50 | 8/10 |
-| 40,740 (latest) | **42.4%** | 41/50 | **9/10** |
+| 40,740 | 42.4% | 41/50 | 9/10 |
+| 50,740 (latest) | **42.8%** | 39/50 | 9/10 |
 
-Climbing at every single check, and accelerating rather than slowing (+9.6 points twice in a row over comparable step counts; curated-panel proxy: 20->30->35->40->45->**70%** across 6 checks). The bimanual-coordination spread (3/10 -> 8/10 -> 9/10) is the decisive finding -- direct confirmation that full-backbone plasticity, not more exposure under a frozen backbone, is the lever that matters. Only `place_dual_shoes` has never shown any success anywhere in this project's history; `handover_block` finally broke through at this check.
+**First non-accelerating reading** at the latest check (+0.4 vs +9.6 twice in a row before it) -- not yet confirmed as a real plateau (substantial per-task churn underneath the flat aggregate, consistent with n=5 sampling noise; one flat check does not override the project's patience policy on its own). Milestone: `place_dual_shoes` finally broke through (0%->20%) at this check -- the single bimanual task that had never shown any success anywhere in this project's history. All 10 bimanual tasks have now shown nonzero success at some point, though not simultaneously. **Watch the next check closely** -- a second flat/negative reading would be real evidence of a plateau worth investigating rather than continuing to extend blindly.
 
-**LIBERO retention, all 4 canonical suites, cumulative step 40,740** (first full 4-suite check since exp0014, closing the previously-flagged Object/Goal evidence gap): **Spatial 96.0%, Object 100.0%, Goal 96.0%, Long 98.0% -- overall 97.5%.** Every suite comfortably clears the 90% floor; Object/Goal are now stronger than exp0014's original baseline (99.0%/97.0%). LIBERO retention has never been at risk anywhere in this candidate's run, and this is the strongest reading yet. Evidence gap closed -- no longer a promotion blocker on its own (still must hold at whatever checkpoint is eventually considered for promotion).
+**LIBERO retention, all 4 canonical suites**: 40,740 -- Spatial 96.0%, Object 100.0%, Goal 96.0%, Long 98.0% (overall 97.5%); 50,740 -- Spatial 96.0%, Object 98.0%, Goal 96.0%, Long 96.0% (overall 96.5%). Both essentially identical, comfortably clearing the 90% floor on every suite. LIBERO retention has never been at risk anywhere in this candidate's run.
 
-**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont5_3e-5/2026-08-28_11-11-15/checkpoints/weights/step_030000.pt` (cumulative step 40,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
+**Operational note**: running the full-50-task RoboTwin scan and full 4-suite LIBERO check concurrently is **not reliably safe** -- worked cleanly at cumulative step 40,740 but crashed with `CUBLAS_STATUS_ALLOC_FAILED` at 50,740 under the identical pattern. Run them sequentially going forward.
+
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont6_3e-5/2026-08-29_07-20-54/checkpoints/weights/step_040000.pt` (cumulative step 50,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
 
 ### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 

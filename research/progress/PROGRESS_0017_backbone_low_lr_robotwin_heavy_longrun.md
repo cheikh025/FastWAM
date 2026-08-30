@@ -305,6 +305,34 @@ Every suite comfortably clears the 90% floor -- Object and Goal are now *stronge
 
 Both eval jobs (full-50-task RoboTwin scan and full 4-suite LIBERO check) were run **concurrently** this round to save wall-clock time -- no OOM, no crashes this time; GPU memory stayed at 25-60GB free per GPU throughout. **Correction (cont6 check, 2026-08-30): this was not actually safe in general** -- the identical concurrent-launch pattern on `cont6`'s checkpoint crashed the LIBERO 4-suite manager with `CUBLAS_STATUS_ALLOC_FAILED` (GPU0 down to <1GB free while the RoboTwin scan's per-task memory footprint varied over time). The manager aborts the entire run on a single failed subtask, so this is not a partial-data situation -- the whole LIBERO check must be relaunched. **Revised rule**: do not run the full-50-task RoboTwin scan and the full 4-suite LIBERO check concurrently; run them sequentially instead. The earlier "confirmed safe" note was true only for that specific checkpoint's timing, not a general property.
 
+### cont6 — cumulative step ~50,740, `cont6` completed its own 40,000-step ceiling naturally, 2026-08-30
+
+`cont6` (directory/full-state resume from `cont5`'s `step_030000`, `max_steps` extended 30000->40000) ran to completion cleanly (exit code 0, final checkpoint `step_040000.pt`). Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont6`'s own 40000 = 50,740.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock 100%, open_laptop **100%** (up from 60%), press_stapler 60%, turn_switch 40% (down from 60%). **Mean 75%** -- still climbing (20->30->35->40->45->70->75%) but a much smaller step than the prior two checks.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont6_3e-5_2026-08-29_07-20-54/20260830_015938/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.428` (42.8%)** -- essentially flat vs. 42.4% at the previous checkpoint (+0.4 points, vs. +9.6 twice in a row before this) -- **the first non-accelerating reading in this candidate's history.** 39/50 tasks nonzero (down slightly from 41/50).
+
+Real task-level churn underneath the flat aggregate (not a clean plateau): several tasks dropped 20-60 points (`place_phone_stand` 60->0, `adjust_bottle` 100->60, `place_object_stand` 100->60, `move_stapler_pad` 40->0, `stack_bowls_three` 40->0) while others gained comparably (`place_cans_plasticbox` 40->80, `place_empty_cup` 0->40, `stamp_seal` 0->40, `place_object_basket` 20->60). At n=5/task this magnitude of individual-task swing is consistent with normal sampling noise, not necessarily a real ceiling -- most single-task deltas are exactly what a 1-2 episode flip produces at this trial count.
+
+**Milestone: `place_dual_shoes` finally broke through (0%->20%)** -- the single bimanual task that had never shown any success anywhere in this project's entire history (every frozen-backbone candidate, and every prior exp0017 check). With this, all 10 bimanual/handover tasks have now shown nonzero success at some point in this candidate's run (though not simultaneously -- `lift_pot` dipped to 0% this same check).
+
+**Full 4-suite LIBERO check**: first attempt **crashed** -- launched concurrently with the RoboTwin scan (same pattern that worked cleanly at the prior checkpoint) and hit `CUBLAS_STATUS_ALLOC_FAILED` on GPU0 when the RoboTwin scan's per-task memory footprint happened to leave <1GB free. The LIBERO manager aborts the entire run on any single subtask failure, so this produced no data -- corrected the standing note in this file (concurrent eval launch is not reliably safe; do sequentially instead) and relaunched LIBERO alone after the RoboTwin scan finished. Retry succeeded cleanly: raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260830_034028/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 96.0% (48/50) |
+| Object | 98.0% (49/50) |
+| Goal | 96.0% (48/50) |
+| Long | 96.0% (48/50) |
+| **Overall** | **96.5%** |
+
+Essentially unchanged from the prior checkpoint's 97.5% (within n=5 noise). All 4 suites comfortably clear the 90% floor. LIBERO retention remains a non-issue.
+
+**Decision: `CONTINUE_TRAINING`.** Per the project's own patience policy, a single flat reading after two strong consecutive jumps does not establish a plateau on its own, especially given the substantial per-task noise underneath the flat aggregate and the genuine milestone (all 10 bimanual tasks now proven capable). LIBERO remains fully stable. However, **this is the first check that should be weighed carefully at the next evaluation** -- if the next full-50-task reading is also flat or negative, that would be real evidence of a plateau worth investigating (e.g. LR nearing the end of its cosine schedule, or a genuine capability ceiling under this data mixture) rather than continuing to extend blindly.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
