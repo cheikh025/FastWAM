@@ -303,7 +303,7 @@ Every suite comfortably clears the 90% floor -- Object and Goal are now *stronge
 
 **Decision: `CONTINUE_TRAINING`.** Six consecutive checks, zero plateau (if anything the per-check RoboTwin gain is accelerating: +9.6 twice in a row over comparable step counts), zero LIBERO risk (all 4 suites now confirmed, strongest reading yet), and bimanual coverage is essentially complete (9/10). No basis to stop. Extending again.
 
-Both eval jobs (full-50-task RoboTwin scan and full 4-suite LIBERO check) were run **concurrently** this round to save wall-clock time -- confirmed safe (no OOM, no crashes; GPU memory stayed at 25-60GB free per GPU throughout).
+Both eval jobs (full-50-task RoboTwin scan and full 4-suite LIBERO check) were run **concurrently** this round to save wall-clock time -- no OOM, no crashes this time; GPU memory stayed at 25-60GB free per GPU throughout. **Correction (cont6 check, 2026-08-30): this was not actually safe in general** -- the identical concurrent-launch pattern on `cont6`'s checkpoint crashed the LIBERO 4-suite manager with `CUBLAS_STATUS_ALLOC_FAILED` (GPU0 down to <1GB free while the RoboTwin scan's per-task memory footprint varied over time). The manager aborts the entire run on a single failed subtask, so this is not a partial-data situation -- the whole LIBERO check must be relaunched. **Revised rule**: do not run the full-50-task RoboTwin scan and the full 4-suite LIBERO check concurrently; run them sequentially instead. The earlier "confirmed safe" note was true only for that specific checkpoint's timing, not a general property.
 
 ## 7-12.
 
