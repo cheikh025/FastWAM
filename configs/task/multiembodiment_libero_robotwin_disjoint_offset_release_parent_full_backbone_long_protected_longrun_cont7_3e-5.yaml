@@ -1,0 +1,53 @@
+# @package _global_
+#
+# exp0017 cont7: one more extension to distinguish noise from a real plateau.
+# cont6's completion (cumulative step ~50,740) gave the first non-accelerating
+# full-50-task RoboTwin reading in this candidate's history: 42.8% vs 42.4% at
+# the prior check (+0.4, vs +9.6 twice in a row before it). However, this is a
+# single flat reading with substantial per-task churn underneath (many tasks
+# moved 20-40 points in both directions at n=5/task -- consistent with normal
+# sampling noise, not necessarily a real capacity ceiling), and it also came
+# with a genuine milestone: place_dual_shoes -- the one bimanual task that had
+# never shown success anywhere in this project's history -- finally broke
+# through (0%->20%). LIBERO remains fully stable (96.5% overall, all 4 suites
+# comfortably above 90%, essentially unchanged from the prior check).
+#
+# Per the project's own patience policy, one flat check does not establish a
+# plateau. This extension is specifically to get a second data point: if the
+# next full-50-task reading is also flat or negative, that is real evidence
+# worth stopping and investigating (e.g. querying whether the cosine LR
+# schedule's decay is now the dominant factor, or whether a genuine capability
+# ceiling has been reached under this data mixture) rather than continuing to
+# extend blindly.
+#
+# max_steps=50000 (this phase's own schedule) resumed via directory (full-state)
+# resume from cont6's own step_040000 (global_step=40000) -- the scheduler
+# rebuilds for the new, larger max_steps and fast-forwards to global_step=40000
+# (80% through the new schedule), reopening the LR to continue exploring rather
+# than staying decayed near-zero from cont6's own now-completed schedule.
+#
+# Everything else unchanged (data mixing, full backbone, LR, batch_size).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 50000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont6_3e-5/2026-08-29_07-20-54/checkpoints/state/step_040000
