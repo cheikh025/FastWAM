@@ -335,6 +335,12 @@ RoboTwin-heavy for the first N steps, then flip to 1:1 or LIBERO-heavy), (3) LIB
 checks concentrated around the ratio-flip point where retention risk is most likely to surface.
 Recorded here so it isn't lost; not yet designed as a full exp0017 candidate record.
 
+## Disk-management gotcha -- the checkpoint watchdog's per-run-directory retention never reclaims across `cont` phases (2026-08-31)
+
+`checkpoint_watchdog.sh` (see `setup_logs/checkpoint_watchdog.sh`) prunes each `runs/<task>/<run_id>/checkpoints/{weights,state}` directory independently, keeping `KEEP_WEIGHTS=2`/`KEEP_STATE=1` *within that directory*. Since exp0017's `cont1`-`cont8` extension pattern gives every phase its own timestamped run directory, each completed phase permanently locks ~103GB (2x ~12GB weights + 1x ~80GB state) at its own floor -- the watchdog has no mechanism to notice that `cont3` through `cont7` are fully superseded once `cont8` has successfully resumed past them. Free space quietly dropped from 445GB to 240GB over the `cont6`->`cont8` window purely from this accumulation, not from any single large save.
+
+**Fix applied**: once a new `cont` phase is confirmed running stably past a prior phase's final checkpoint (i.e. the resume succeeded and training has advanced further), that prior phase's `checkpoints/weights` and `checkpoints/state` are safe to delete entirely -- the numeric results are already durably recorded in `research/progress/PROGRESS_0017_backbone_low_lr_robotwin_heavy_longrun.md`/`research/STATE.md`/`research/EXPERIMENTS.jsonl`, and the exact resume lineage is preserved in each phase's own git-tracked task config. Deleted `cont3`-`cont6`'s checkpoints (515GB reclaimed) while keeping `cont7` (one-generation-back safety net) and the active `cont8`. **Going forward**: after each new `cont` phase's resume is confirmed stable, clean up the phase two generations back (keep the immediately-prior phase as a fallback, delete anything older) rather than waiting for the watchdog's `MIN_FREE_GB` panic threshold.
+
 ## GPU throughput diagnosis -- straggler effect from mixed-embodiment batch cost, confirmed via config inspection (2026-08-21)
 
 Investigated why multi-embodiment training (~0.0215 steps/s) is much slower than LIBERO-only
