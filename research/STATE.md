@@ -89,20 +89,23 @@ Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approache
 
 **Full-50-task RoboTwin Clean mean, all measurements taken so far**:
 
-| Cumulative step | Clean mean | Nonzero tasks | Bimanual tasks nonzero (of 10) |
-|---:|---:|---:|---:|
-| 19,740 | 23.2% | 23/50 | 3/10 |
-| 30,740 | 32.8% | 36/50 | 8/10 |
-| 40,740 | 42.4% | 41/50 | 9/10 |
-| 50,740 (latest) | **42.8%** | 39/50 | 9/10 |
+| Cumulative step | Clean mean | Delta | Nonzero tasks | Bimanual tasks nonzero (of 10) |
+|---:|---:|---:|---:|---:|
+| 19,740 | 23.2% | -- | 23/50 | 3/10 |
+| 30,740 | 32.8% | +9.6 | 36/50 | 8/10 |
+| 40,740 | 42.4% | +9.6 | 41/50 | 9/10 |
+| 50,740 | 42.8% | +0.4 | 39/50 | 9/10 |
+| 60,740 (latest) | **46.0%** | +3.2 | 43/50 | 9/10 |
 
-**First non-accelerating reading** at the latest check (+0.4 vs +9.6 twice in a row before it) -- not yet confirmed as a real plateau (substantial per-task churn underneath the flat aggregate, consistent with n=5 sampling noise; one flat check does not override the project's patience policy on its own). Milestone: `place_dual_shoes` finally broke through (0%->20%) at this check -- the single bimanual task that had never shown any success anywhere in this project's history. All 10 bimanual tasks have now shown nonzero success at some point, though not simultaneously. **Watch the next check closely** -- a second flat/negative reading would be real evidence of a plateau worth investigating rather than continuing to extend blindly.
+Growth has clearly **decelerated** from the initial +9.6/+9.6 pace but **has not plateaued** -- the cont6 flat reading (+0.4) turned out to be noise, not a ceiling, confirmed by cont7's real +3.2 gain. `lift_pot` is now the sole bimanual task sitting at 0% (all other 9 have shown nonzero success). **If the next 1-2 checks average out below ~+2/check, that becomes a real case for a genuine capacity/data-mixture ceiling under this recipe** -- worth a `$investigate-fastwam-problem` pass rather than continuing to extend blindly.
 
-**LIBERO retention, all 4 canonical suites**: 40,740 -- Spatial 96.0%, Object 100.0%, Goal 96.0%, Long 98.0% (overall 97.5%); 50,740 -- Spatial 96.0%, Object 98.0%, Goal 96.0%, Long 96.0% (overall 96.5%). Both essentially identical, comfortably clearing the 90% floor on every suite. LIBERO retention has never been at risk anywhere in this candidate's run.
+**LIBERO retention, all 4 canonical suites**: 40,740 -- 97.5% overall; 50,740 -- 96.5% overall; 60,740 -- **97.5% overall** (Spatial 98.0%, Object 100.0%, Goal 96.0%, Long 96.0%), matching the strongest reading yet. Comfortably clearing the 90% floor on every suite at every check. LIBERO retention has never been at risk anywhere in this candidate's run.
 
-**Operational note**: running the full-50-task RoboTwin scan and full 4-suite LIBERO check concurrently is **not reliably safe** -- worked cleanly at cumulative step 40,740 but crashed with `CUBLAS_STATUS_ALLOC_FAILED` at 50,740 under the identical pattern. Run them sequentially going forward.
+**Operational notes**:
+- Running the full-50-task RoboTwin scan and full 4-suite LIBERO check concurrently is **not reliably safe** -- worked cleanly once, crashed with `CUBLAS_STATUS_ALLOC_FAILED` once under the identical pattern. Run them sequentially.
+- The LIBERO eval manager's documented "stale tmux session" bug (`research/NOTES.md`) recurred at cumulative step 60,740 (scheduler stuck reporting 8/8 tasks "Running" for 2+ hours while all 4 GPUs sat at 0% util). Fixed with the documented procedure (`kill -9` the manager, verify clean tmux state, relaunch) -- succeeded immediately on retry. Treat "GPUs idle while scheduler claims tasks running" as this bug by default going forward.
 
-**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont6_3e-5/2026-08-29_07-20-54/checkpoints/weights/step_040000.pt` (cumulative step 50,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont7_3e-5/2026-08-30_04-05-46/checkpoints/weights/step_050000.pt` (cumulative step 60,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
 
 ### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 

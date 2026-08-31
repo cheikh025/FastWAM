@@ -333,6 +333,32 @@ Essentially unchanged from the prior checkpoint's 97.5% (within n=5 noise). All 
 
 **Decision: `CONTINUE_TRAINING`.** Per the project's own patience policy, a single flat reading after two strong consecutive jumps does not establish a plateau on its own, especially given the substantial per-task noise underneath the flat aggregate and the genuine milestone (all 10 bimanual tasks now proven capable). LIBERO remains fully stable. However, **this is the first check that should be weighed carefully at the next evaluation** -- if the next full-50-task reading is also flat or negative, that would be real evidence of a plateau worth investigating (e.g. LR nearing the end of its cosine schedule, or a genuine capability ceiling under this data mixture) rather than continuing to extend blindly.
 
+### cont7 — cumulative step ~60,740, `cont7` completed its own 50,000-step ceiling naturally, 2026-08-31
+
+`cont7` (directory/full-state resume from `cont6`'s `step_040000`, `max_steps` extended 40000->50000) ran to completion cleanly. Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont7`'s own 50000 = 60,740. This check was specifically designed (per `cont7`'s own launch note) to determine whether `cont6`'s flat +0.4 reading was noise or a real plateau.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock 100%, turn_switch 40% (unchanged), press_stapler 60% (unchanged), open_laptop 80% (down from 100%). **Mean 70%**, down slightly from 75%.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont7_3e-5_2026-08-30_04-05-46/20260830_221904/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.460` (46.0%)** -- up from 42.8% (+3.2 points). **Answers the plateau question: this is real continued progress, not a dead ceiling** -- growth has clearly decelerated from the initial +9.6/+9.6 pace, but it has not stopped. 43/50 tasks nonzero (up from 39/50). Bimanual tasks: `pick_diverse_bottles` 20%->60%, `scan_object` 20%->40% (both real gains), `place_object_basket` 60%->40% (dip); rest held steady. 9/10 bimanual tasks nonzero (`lift_pot` the sole holdout at 0%, unchanged from the prior check).
+
+**Full 4-suite LIBERO check**: raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260831_000035/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 98.0% (49/50) |
+| Object | 100.0% (50/50) |
+| Goal | 96.0% (48/50) |
+| Long | 96.0% (48/50) |
+| **Overall** | **97.5%** |
+
+Matches the strongest LIBERO reading of the entire candidate. Retention remains a complete non-issue.
+
+**Infra note**: the LIBERO eval manager hit the previously-documented "stale tmux session" bug (`research/NOTES.md`) -- scheduler reported 8 tasks "Running" for 2+ hours while `nvidia-smi` showed 0% GPU/0MB used on all 4 GPUs and `tmux ls` showed no server running. Fixed per the documented procedure: `kill -9` the stuck manager process, confirmed `tmux kill-server`/`tmux ls` showed a clean state, relaunched the identical command -- succeeded immediately on retry. Not a candidate-validity issue, purely an eval-infra flake.
+
+**Decision: `CONTINUE_TRAINING`.** The deceleration from cont6 was real but the trend is still positive, not flat -- +3.2 points is a genuine (if smaller) gain, and the underlying task-level picture (more nonzero tasks, real bimanual gains) supports continuing rather than switching strategy. LIBERO remains rock-solid. Extending again, though the growth-rate trend (9.6, 9.6, 0.4, 3.2) is worth tracking closely -- if the next 1-2 checks average out below ~+2/check, that would be a stronger case for a genuine capacity/data-mixture ceiling under this specific recipe, worth a `$investigate-fastwam-problem` pass rather than continuing to extend blindly.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.

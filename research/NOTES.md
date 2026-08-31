@@ -133,6 +133,8 @@ Separately: weights-only `resume=<file>` restarts the trainer's step counter at 
 
 **Fix**: `kill -9` the manager process, `tmux kill-server` (clears any stale server/session state), verify `tmux ls` reports no sessions and a fresh manual `tmux new-session -d -s <test>` succeeds, then relaunch the eval command unchanged. **Diagnostic check before assuming an eval is progressing**: cross-reference the scheduler's "Running: N" claim against actual `nvidia-smi` GPU utilization/memory -- if GPUs are idle while the scheduler claims tasks are running, suspect this tmux failure mode rather than waiting longer.
 
+**Recurred** during exp0017 `cont7`'s full 4-suite LIBERO check (2026-08-31) -- identical symptom (8/8 tasks "Running" for 2+ hours, all 4 GPUs at 0% util/0MB used, `tmux ls` reporting no server). Same fix applied, succeeded immediately on retry. This is not a one-off -- treat "GPUs idle while scheduler claims tasks running" as this bug by default on any future LIBERO eval, not just the first time it's seen.
+
 ## Hardware sizing — max concurrent full-model workers per A100-80GB
 
 Each FastWAM eval worker (LIBERO or presumably RoboTwin) loads a full model instance using ~14-20GB. `MULTIRUN.max_tasks_per_gpu=5` (the manager's apparent default) OOMs on an 80GB A100; `max_tasks_per_gpu=2` is safe (confirmed empirically — 2 workers x ~20GB = ~41GB used, comfortable headroom). Use `<=2` per GPU for LIBERO/RoboTwin eval on this hardware; treat as a starting point for sizing concurrent multi-embodiment training workers too.
