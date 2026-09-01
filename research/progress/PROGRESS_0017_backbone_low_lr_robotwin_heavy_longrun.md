@@ -385,6 +385,32 @@ Bimanual tasks churned again at n=5 (not a clean trend either direction): `hando
 
 **Decision: `CONTINUE_TRAINING`.** Growth-rate trend across the last four checks: +9.6, +0.4, +3.2, +6.0 -- noisy but net positive, with no evidence of a genuine ceiling. Combined with LIBERO's strongest-ever reading, there is no basis to change strategy. Extending again.
 
+### cont9 — cumulative step ~80,740, `cont9` completed its own 70,000-step ceiling naturally, 2026-09-01
+
+`cont9` (directory/full-state resume from `cont8`'s `step_060000`, `max_steps` extended 60000->70000) ran to completion cleanly. Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont9`'s own 70000 = 80,740.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock 100%, press_stapler 60%, open_laptop 80%, turn_switch 20% (down from 40%). **Mean 65%**, down slightly from 70%.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont9_3e-5_2026-09-01_00-53-41/20260901_193340/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.520` (52.0%)** -- exactly flat vs. cont8 (second genuinely flat reading in this candidate's history, after cont6's +0.4). 43/50 tasks nonzero (down from 45/50). Heavy task-level churn in both directions at n=5 (`scan_object` 40%->100%, `place_cans_plasticbox` 20%->100%, `beat_block_hammer` 60%->100% vs. `turn_switch`/`put_bottles_dustbin`/`stack_bowls_three` all dropping to 0%) -- consistent with sampling noise rather than a real ceiling, the same pattern that made cont6's flat reading resolve as noise at the next check.
+
+**Milestone: all 10 bimanual/handover tasks are nonzero simultaneously for the first time** -- `place_dual_shoes`, `handover_block`, and `lift_pot` (previously the last holdouts, individually) all show nonzero success at this same checkpoint together. Every prior check had at most 9/10 nonzero at once.
+
+**Full 4-suite LIBERO check**: raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260901_211110/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 98.0% (49/50) |
+| Object | 100.0% (50/50) |
+| Goal | 96.0% (48/50) |
+| Long | 96.0% (48/50) |
+| **Overall** | **97.5%** |
+
+Essentially unchanged from cont8's 98.0%. Retention remains a complete non-issue.
+
+**Decision: `CONTINUE_TRAINING`.** A flat aggregate reading with this much underlying task churn and a genuine positive milestone (10/10 bimanual simultaneous) is not strong evidence of a real ceiling -- the same signature as cont6, which turned out to be noise. Extending again; the next check will be the real test of whether growth resumes (as it did after cont6) or genuinely stalls.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
