@@ -1,0 +1,50 @@
+# @package _global_
+#
+# exp0017 cont10: this extension is specifically the "next check" flagged as the
+# real test after cont9's flat aggregate reading. cont9's completion (cumulative
+# step ~80,740) gave clean_mean_success_rate=52.0%, exactly flat vs. cont8 --
+# the second genuinely flat reading in this candidate's history (after cont6's
+# +0.4). However, unlike a clean plateau, this came with heavy two-directional
+# task-level churn (several tasks swinging 40-80 points either way at n=5) and a
+# genuine milestone: all 10 bimanual/handover tasks were nonzero simultaneously
+# for the first time ever in this project. This is the same signature cont6
+# showed before growth resumed at cont7 (+3.2) and cont8 (+6.0). LIBERO remains
+# fully stable at 97.5% overall (Spatial 98.0%, Object 100.0%, Goal 96.0%,
+# Long 96.0%).
+#
+# If this check is also flat or negative, that becomes the strongest evidence
+# yet of a genuine capacity/data-mixture ceiling under this recipe, and should
+# trigger a dedicated investigation (e.g. via $investigate-fastwam-problem)
+# rather than another blind extension.
+#
+# max_steps=80000 (this phase's own schedule) resumed via directory (full-state)
+# resume from cont9's own step_070000 (global_step=70000) -- the scheduler
+# rebuilds for the new, larger max_steps and fast-forwards to global_step=70000
+# (87.5% through the new schedule), reopening the LR to continue exploring rather
+# than staying decayed near-zero from cont9's own now-completed schedule.
+#
+# Everything else unchanged (data mixing, full backbone, LR, batch_size).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 80000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont9_3e-5/2026-09-01_00-53-41/checkpoints/state/step_070000
