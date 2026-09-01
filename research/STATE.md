@@ -89,23 +89,24 @@ Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approache
 
 **Full-50-task RoboTwin Clean mean, all measurements taken so far**:
 
-| Cumulative step | Clean mean | Delta | Nonzero tasks | Bimanual tasks nonzero (of 10) |
-|---:|---:|---:|---:|---:|
-| 19,740 | 23.2% | -- | 23/50 | 3/10 |
-| 30,740 | 32.8% | +9.6 | 36/50 | 8/10 |
-| 40,740 | 42.4% | +9.6 | 41/50 | 9/10 |
-| 50,740 | 42.8% | +0.4 | 39/50 | 9/10 |
-| 60,740 (latest) | **46.0%** | +3.2 | 43/50 | 9/10 |
+| Cumulative step | Clean mean | Delta | Nonzero tasks |
+|---:|---:|---:|---:|
+| 19,740 | 23.2% | -- | 23/50 |
+| 30,740 | 32.8% | +9.6 | 36/50 |
+| 40,740 | 42.4% | +9.6 | 41/50 |
+| 50,740 | 42.8% | +0.4 | 39/50 |
+| 60,740 | 46.0% | +3.2 | 43/50 |
+| 70,740 (latest) | **52.0%** | +6.0 | 45/50 |
 
-Growth has clearly **decelerated** from the initial +9.6/+9.6 pace but **has not plateaued** -- the cont6 flat reading (+0.4) turned out to be noise, not a ceiling, confirmed by cont7's real +3.2 gain. `lift_pot` is now the sole bimanual task sitting at 0% (all other 9 have shown nonzero success). **If the next 1-2 checks average out below ~+2/check, that becomes a real case for a genuine capacity/data-mixture ceiling under this recipe** -- worth a `$investigate-fastwam-problem` pass rather than continuing to extend blindly.
+**Growth rate is noisy but net positive across the whole trajectory (+9.6, +9.6, +0.4, +3.2, +6.0) -- no evidence of a genuine ceiling.** First crossing of the 50% mark. Bimanual tasks now bounce around individually at n=5 (e.g. `place_dual_shoes`/`handover_block` dipped back to 0% at the latest check after showing nonzero earlier) -- treat single-task bimanual swings as noise, not signal; the more reliable read is the total zero-task count, which has fallen steadily (27 -> 14 -> 9 -> 11 -> 7 -> 5 tasks at zero across the six checks).
 
-**LIBERO retention, all 4 canonical suites**: 40,740 -- 97.5% overall; 50,740 -- 96.5% overall; 60,740 -- **97.5% overall** (Spatial 98.0%, Object 100.0%, Goal 96.0%, Long 96.0%), matching the strongest reading yet. Comfortably clearing the 90% floor on every suite at every check. LIBERO retention has never been at risk anywhere in this candidate's run.
+**LIBERO retention, all 4 canonical suites**: 40,740 -- 97.5%; 50,740 -- 96.5%; 60,740 -- 97.5%; 70,740 -- **98.0%** (all four suites exactly 98.0%) -- strongest reading yet. Comfortably clearing the 90% floor on every suite at every check. LIBERO retention has never been at risk anywhere in this candidate's run.
 
 **Operational notes**:
 - Running the full-50-task RoboTwin scan and full 4-suite LIBERO check concurrently is **not reliably safe** -- worked cleanly once, crashed with `CUBLAS_STATUS_ALLOC_FAILED` once under the identical pattern. Run them sequentially.
 - The LIBERO eval manager's documented "stale tmux session" bug (`research/NOTES.md`) recurred at cumulative step 60,740 (scheduler stuck reporting 8/8 tasks "Running" for 2+ hours while all 4 GPUs sat at 0% util). Fixed with the documented procedure (`kill -9` the manager, verify clean tmux state, relaunch) -- succeeded immediately on retry. Treat "GPUs idle while scheduler claims tasks running" as this bug by default going forward.
 
-**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont7_3e-5/2026-08-30_04-05-46/checkpoints/weights/step_050000.pt` (cumulative step 60,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont8_3e-5/2026-08-31_04-07-08/checkpoints/weights/step_060000.pt` (cumulative step 70,740; not yet durably backed up to `cheikh025/ASR` -- `HF_TOKEN` is currently unset in this environment, blocking upload; flagged to the user 2026-08-28, not yet resolved).
 
 ### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 

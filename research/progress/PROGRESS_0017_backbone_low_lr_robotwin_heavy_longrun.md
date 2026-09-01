@@ -359,6 +359,32 @@ Matches the strongest LIBERO reading of the entire candidate. Retention remains 
 
 **Decision: `CONTINUE_TRAINING`.** The deceleration from cont6 was real but the trend is still positive, not flat -- +3.2 points is a genuine (if smaller) gain, and the underlying task-level picture (more nonzero tasks, real bimanual gains) supports continuing rather than switching strategy. LIBERO remains rock-solid. Extending again, though the growth-rate trend (9.6, 9.6, 0.4, 3.2) is worth tracking closely -- if the next 1-2 checks average out below ~+2/check, that would be a stronger case for a genuine capacity/data-mixture ceiling under this specific recipe, worth a `$investigate-fastwam-problem` pass rather than continuing to extend blindly.
 
+### cont8 — cumulative step ~70,740, `cont8` completed its own 60,000-step ceiling naturally, 2026-09-01
+
+`cont8` (directory/full-state resume from `cont7`'s `step_050000`, `max_steps` extended 50000->60000) ran to completion cleanly. Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont8`'s own 60000 = 70,740.
+
+**RoboTwin curated 4-task panel, Clean phase**: click_alarmclock 100%, press_stapler 60%, turn_switch 40%, open_laptop 80%. **Mean 70%**, unchanged from cont7.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont8_3e-5_2026-08-31_04-07-08/20260831_225235/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.520` (52.0%)** -- up from 46.0% (+6.0 points) -- the deceleration reversed; this is a faster gain than the prior check. **First time crossing the 50% mark.** 45/50 tasks nonzero (up from 43/50).
+
+Bimanual tasks churned again at n=5 (not a clean trend either direction): `handover_mic` 60%->100%, `pick_dual_bottles` 80%->100%, `grab_roller` 20%->40% (real gains); `place_dual_shoes` 20%->0%, `handover_block` 20%->0% (both dipped back to zero this check, having shown nonzero success previously -- consistent with ongoing n=5 noise on the hardest tasks rather than lost capability). 7/10 bimanual tasks nonzero this check (down from 9/10, but every task in the set has shown nonzero success at some point in the candidate's history). Only 5/50 tasks total are at zero this check (down from 7/50) -- the overall trend (fewer zero tasks, higher mean) is unambiguously positive even though individual bimanual tasks bounce around.
+
+**Full 4-suite LIBERO check**: raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260901_002853/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 98.0% (49/50) |
+| Object | 98.0% (49/50) |
+| Goal | 98.0% (49/50) |
+| Long | 98.0% (49/50) |
+| **Overall** | **98.0%** |
+
+**Strongest LIBERO reading of the entire candidate** -- all four suites land at exactly 98.0%. Retention remains a complete non-issue.
+
+**Decision: `CONTINUE_TRAINING`.** Growth-rate trend across the last four checks: +9.6, +0.4, +3.2, +6.0 -- noisy but net positive, with no evidence of a genuine ceiling. Combined with LIBERO's strongest-ever reading, there is no basis to change strategy. Extending again.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
