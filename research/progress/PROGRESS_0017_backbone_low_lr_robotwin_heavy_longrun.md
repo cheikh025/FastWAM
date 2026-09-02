@@ -437,6 +437,14 @@ Matches the strongest reading seen so far. Retention remains a complete non-issu
 
 **Decision: `CONTINUE_TRAINING`.** cont9's flat reading is confirmed as noise (cont10 resumed growth at +2.8), LIBERO is rock-solid across all 4 suites, and Clean/Randomized are now confirmed close to each other (54.8% vs. 53.2%) rather than Randomized being dramatically harder. Extending again.
 
+### Higher-precision Clean re-check, n=20, cont10 checkpoint (cumulative step 90,740), 2026-09-02
+
+Per explicit user request, re-ran the full 50-task Clean scan at n=20/task (4x the standard screening n=5) on `cont10`'s checkpoint, using `max_tasks_per_gpu=2` (8 workers) -- confirmed safe again, zero OOM, zero failures across all 50 tasks. Took ~2h50m wall-clock. Raw: `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5_2026-09-01_21-36-24/20260902_204514/summary.json`.
+
+**`clean_mean_success_rate = 0.521` (52.1%)** -- very close to the n=5 estimate (54.8%), confirming that reading wasn't a lucky sample. 47/50 tasks nonzero (up from 43/50 at n=5 -- more trials revealed a few additional low-but-nonzero tasks, as expected). This is the most precise single-checkpoint RoboTwin estimate in the project's history.
+
+**Training status**: paused at `cont11` step_080500 per explicit user request (2026-09-02), specifically to ensure a clean, fully-backed-up checkpoint before continuing. All code/records pushed to GitHub (0 unpushed commits); `cont9` and `cont10` checkpoints durably backed up to `cheikh025/ASR`, byte-verified. Resume is a single command away whenever training continues.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
