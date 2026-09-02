@@ -111,7 +111,7 @@ Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approache
 - The LIBERO eval manager's documented "stale tmux session" bug (`research/NOTES.md`) recurred at cumulative step 60,740 (scheduler stuck reporting 8/8 tasks "Running" for 2+ hours while all 4 GPUs sat at 0% util). Fixed with the documented procedure (`kill -9` the manager, verify clean tmux state, relaunch) -- succeeded immediately on retry. Treat "GPUs idle while scheduler claims tasks running" as this bug by default going forward.
 - `max_tasks_per_gpu=2` confirmed safe for RoboTwin scans (previously only tested at 1) -- prefer 2 going forward for faster turnaround, but keep watching GPU memory closely on the first use at any new checkpoint since headroom varies with model state.
 
-**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5/2026-09-01_21-36-24/checkpoints/weights/step_080000.pt` (cumulative step 90,740; not yet backed up to `cheikh025/ASR` -- do next).
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5/2026-09-01_21-36-24/checkpoints/weights/step_080000.pt` (cumulative step 90,740). **Durably backed up** to `cheikh025/ASR:research/exp0017_backbone_full_long_protected_longrun/step_080000_cumulative.pt` (2026-09-02, verified byte-exact, 12,041,907,845 bytes both sides).
 
 ### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 
