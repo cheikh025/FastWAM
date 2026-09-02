@@ -97,17 +97,21 @@ Unfroze the full shared backbone (unlike exp0014/15/16's frozen/low-LR approache
 | 50,740 | 42.8% | +0.4 | 39/50 |
 | 60,740 | 46.0% | +3.2 | 43/50 |
 | 70,740 | 52.0% | +6.0 | 45/50 |
-| 80,740 (latest) | **52.0%** | +0.0 | 43/50 |
+| 80,740 | 52.0% | +0.0 | 43/50 |
+| 90,740 (latest) | **54.8%** | +2.8 | 43/50 |
 
-**Growth rate is noisy but net positive across the whole trajectory (+9.6, +9.6, +0.4, +3.2, +6.0, +0.0) -- no confirmed ceiling yet.** The latest check is the second genuinely flat reading (after cont6's +0.4) -- but it came with heavy two-directional task churn and a real milestone (all 10 bimanual tasks nonzero simultaneously for the first time), the same signature that preceded cont6's subsequent recovery. Treat single-task swings as noise; the more reliable read is the total zero-task count: 27 -> 14 -> 9 -> 11 -> 7 -> 5 -> 7 across the last six checks -- still trending down overall but the latest tick is up, worth watching. **The next check is the real test**: if it's also flat/negative, that's the strongest case yet for a genuine ceiling under this recipe, worth a `$investigate-fastwam-problem` pass.
+**Growth rate is noisy but net positive across the whole trajectory (+9.6, +9.6, +0.4, +3.2, +6.0, +0.0, +2.8) -- no confirmed ceiling.** cont9's flat reading is now resolved: cont10 resumed growth, same pattern as cont6's earlier recovery. Zero-task count: 27 -> 14 -> 9 -> 11 -> 7 -> 5 -> 7 -> 7 across the last seven checks.
 
-**LIBERO retention, all 4 canonical suites**: 40,740 -- 97.5%; 50,740 -- 96.5%; 60,740 -- 97.5%; 70,740 -- 98.0%; 80,740 -- **97.5%** (Spatial 98.0%, Object 100.0%, Goal 96.0%, Long 96.0%). Comfortably clearing the 90% floor on every suite at every check. LIBERO retention has never been at risk anywhere in this candidate's run.
+**First-ever Randomized-phase measurement** (cumulative step 90,740, n=5, per explicit user request): **53.2%** mean, 40/50 nonzero -- very close to the Clean result (54.8%), not dramatically harder. A standalone dispatcher (`experiments/robotwin/run_robotwin_random_only.py`) was written to schedule Random-only (the stock manager always runs Clean before Random per task with no skip option). Also validated `max_tasks_per_gpu=2` for RoboTwin at this checkpoint -- previously untested, confirmed safe (zero OOM, zero failures across 50 tasks), roughly halves wall-clock time for future scans.
+
+**LIBERO retention, all 4 canonical suites**: 40,740 -- 97.5%; 50,740 -- 96.5%; 60,740 -- 97.5%; 70,740 -- 98.0%; 80,740 -- 97.5%; 90,740 -- **97.5%** (Spatial 98.0%, Object 100.0%, Goal 96.0%, Long 96.0%). Comfortably clearing the 90% floor on every suite at every check. LIBERO retention has never been at risk anywhere in this candidate's run.
 
 **Operational notes**:
 - Running the full-50-task RoboTwin scan and full 4-suite LIBERO check concurrently is **not reliably safe** -- worked cleanly once, crashed with `CUBLAS_STATUS_ALLOC_FAILED` once under the identical pattern. Run them sequentially.
 - The LIBERO eval manager's documented "stale tmux session" bug (`research/NOTES.md`) recurred at cumulative step 60,740 (scheduler stuck reporting 8/8 tasks "Running" for 2+ hours while all 4 GPUs sat at 0% util). Fixed with the documented procedure (`kill -9` the manager, verify clean tmux state, relaunch) -- succeeded immediately on retry. Treat "GPUs idle while scheduler claims tasks running" as this bug by default going forward.
+- `max_tasks_per_gpu=2` confirmed safe for RoboTwin scans (previously only tested at 1) -- prefer 2 going forward for faster turnaround, but keep watching GPU memory closely on the first use at any new checkpoint since headroom varies with model state.
 
-**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont9_3e-5/2026-09-01_00-53-41/checkpoints/weights/step_070000.pt` (cumulative step 80,740). **Durably backed up** to `cheikh025/ASR:research/exp0017_backbone_full_long_protected_longrun/step_070000_cumulative.pt` (2026-09-02, user supplied `HF_TOKEN`; verified byte-exact, 12,041,907,845 bytes both sides). Local copy retained.
+**Decision at every check so far**: `CONTINUE_TRAINING`. Current best checkpoint: `runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5/2026-09-01_21-36-24/checkpoints/weights/step_080000.pt` (cumulative step 90,740; not yet backed up to `cheikh025/ASR` -- do next).
 
 ### Superseded: exp0016 (partial backbone plasticity, `dit_with_backbone_low_lr`)
 

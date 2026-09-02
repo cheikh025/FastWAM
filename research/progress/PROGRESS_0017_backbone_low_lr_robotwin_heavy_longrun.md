@@ -411,6 +411,32 @@ Essentially unchanged from cont8's 98.0%. Retention remains a complete non-issue
 
 **Decision: `CONTINUE_TRAINING`.** A flat aggregate reading with this much underlying task churn and a genuine positive milestone (10/10 bimanual simultaneous) is not strong evidence of a real ceiling -- the same signature as cont6, which turned out to be noise. Extending again; the next check will be the real test of whether growth resumes (as it did after cont6) or genuinely stalls.
 
+### cont10 — cumulative step ~90,740, `cont10` completed its own 80,000-step ceiling naturally, 2026-09-02
+
+`cont10` (directory/full-state resume from `cont9`'s `step_070000`, `max_steps` extended 70000->80000) ran to completion cleanly. Cumulative training step: phase-1's 2740 + `cont2`'s 8000 + `cont10`'s own 80000 = 90,740. This was the check flagged as the real test of whether cont9's flat reading was noise (like cont6) or a real plateau.
+
+**Full 50-task RoboTwin Clean scan**: raw `evaluate_results/robotwin/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5_2026-09-01_21-36-24/20260902_163050/summary.json`.
+
+**Overall: `clean_mean_success_rate = 0.548` (54.8%)** -- up from 52.0% (+2.8 points). **Resolves the question: cont9's flat reading was noise, not a plateau** -- same pattern as cont6's earlier recovery. 43/50 tasks nonzero.
+
+**First-ever Randomized-phase measurement in this project** (per explicit user request): `run_robotwin_manager.py` always launches Clean before Random for every task with no way to request Random-only, so a standalone dispatcher (`experiments/robotwin/run_robotwin_random_only.py`) was written reusing the manager's own subprocess-build and result-parsing logic (`_parse_success_rate`, `_phase_result_filename`, `eval_robotwin_single.py`) to schedule only the Random phase across all 50 tasks. Also used this run to validate `max_tasks_per_gpu=2` for RoboTwin (previously untested -- every prior full-50-task scan in this project used `max_tasks_per_gpu=1`); confirmed safe under close monitoring (GPU memory settled 30-62GB used, 18-50GB free per GPU throughout, zero OOM, zero worker failures across all 50 tasks) -- roughly halves wall-clock time for future RoboTwin scans.
+
+**Randomized, n=5: `random_mean_success_rate = 0.532` (53.2%)**, 40/50 tasks nonzero. **Very close to the Clean result (54.8%)** -- Randomized is not dramatically harder than Clean at this checkpoint, a positive sign since the project's goal requires both phases to independently clear 90%.
+
+**Full 4-suite LIBERO check**: raw `evaluate_results/libero/libero_uncond_2cam224_multiembodiment_eval/20260902_191021/summary.json`.
+
+| Suite | Success |
+|---|---:|
+| Spatial | 98.0% (49/50) |
+| Object | 100.0% (50/50) |
+| Goal | 96.0% (48/50) |
+| Long | 96.0% (48/50) |
+| **Overall** | **97.5%** |
+
+Matches the strongest reading seen so far. Retention remains a complete non-issue.
+
+**Decision: `CONTINUE_TRAINING`.** cont9's flat reading is confirmed as noise (cont10 resumed growth at +2.8), LIBERO is rock-solid across all 4 suites, and Clean/Randomized are now confirmed close to each other (54.8% vs. 53.2%) rather than Randomized being dramatically harder. Extending again.
+
 ## 7-12.
 
 To be filled in once training plateaus, LIBERO shows real risk, or the ≥90% target is approached — per `$review-fastwam-experiment`.
