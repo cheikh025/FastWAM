@@ -1,8 +1,9 @@
 """Full-project RoboTwin progress chart -- every candidate in this project's history
 that reached a full-50-task Clean scan (the actual canonical/promotion metric), from
-exp0014 through exp0017. exp0013 never reached this measurement (it collapsed on the
-curated panel before a full-50-task scan was run) and is shown as a separate labeled
-prologue rather than a fabricated point on the main quantitative series.
+exp0014 through exp0017's ongoing cont-phase extensions. exp0013 never reached this
+measurement (it collapsed on the curated panel before a full-50-task scan was run)
+and is shown as a separate labeled prologue rather than a fabricated point on the
+main quantitative series.
 
 Data pulled directly from research/STATE.md and research/progress/PROGRESS_0013-0017*.md.
 """
@@ -18,13 +19,17 @@ labels = [
     "exp0014\nstep 4600 (frozen backbone)",
     "exp0015\n(frozen, RoboTwin-heavy 1:3)",
     "exp0016\nphase 1, step 1000 (low-LR)",
-    "exp0017\nstep ~19,740 (full, protected)",
+    "exp0017 cont3\nstep ~19,740",
+    "exp0017 cont4\nstep ~30,740",
+    "exp0017 cont5\nstep ~40,740",
+    "exp0017 cont6\nstep ~50,740",
+    "exp0017 cont7\nstep ~60,740",
 ]
 x = list(range(len(labels)))
 
 # Full-50-task Clean mean -- None where no full-50-task scan was ever run
-full50 = [None, 12.6, 11.6, 11.6, 9.6, 23.2]
-n_trials = [None, 10, 5, 5, 5, 5]
+full50 = [None, 12.6, 11.6, 11.6, 9.6, 23.2, 32.8, 42.4, 42.8, 46.0]
+n_trials = [None, 10, 5, 5, 5, 5, 5, 5, 5, 5]
 
 annotations = [
     "curated 2-task panel only\n(click_alarmclock 80%,\nturn_switch 60% -> 0%)\ncollapsed before a full-50-\ntask scan could run",
@@ -32,10 +37,14 @@ annotations = [
     "+2000 steps, same recipe\n-- essentially no movement",
     "3x RoboTwin gradient share\n-- still no movement\n(REJECT)",
     "backbone given LR=3e-6\nplasticity -- still flat\n(undertrained, <1% of\nan epoch)",
-    "full backbone + Long-\nprotected mixing, ~19,740\nsteps -- nearly DOUBLE\nany prior candidate",
+    "full backbone unfrozen +\nLong-protected mixing --\nnearly DOUBLE any prior\ncandidate; 3/10 bimanual\ntasks nonzero",
+    "8/10 bimanual tasks\nnonzero (was 3/10);\nLIBERO still 94-96%",
+    "9/10 bimanual tasks\nnonzero; full 4-suite\nLIBERO check: 97.5%\noverall",
+    "first non-accelerating\nreading (+0.4 vs +9.6\ntwice); place_dual_shoes\nfinally nonzero -- 10/10\nbimanual tasks proven",
+    "+3.2 -- resolves cont6's\nflat reading as noise, not\na plateau; LIBERO 97.5%\noverall (strongest yet)",
 ]
 
-fig, ax = plt.subplots(figsize=(14, 7.5))
+fig, ax = plt.subplots(figsize=(18.5, 7.5))
 
 ax.axhline(90, color="#c0392b", linestyle="--", linewidth=1.3, zorder=1)
 ax.text(0.99, 91.3, "90% target", color="#c0392b", fontsize=10, ha="right", transform=ax.get_yaxis_transform())
@@ -51,7 +60,7 @@ yr = [v for v in full50 if v is not None]
 ax.plot(xr, yr, color="#2a78d6", linewidth=2.3, marker="o", markersize=11,
         markerfacecolor="#2a78d6", markeredgecolor="white", markeredgewidth=1.8, zorder=3)
 
-# highlight the exp0017 point distinctly (the decisive result)
+# highlight the latest point distinctly (the current best checkpoint)
 ax.scatter([xr[-1]], [yr[-1]], s=280, facecolor="none", edgecolor="#eb6834", linewidth=2.2, zorder=4)
 
 for xi, yi, n in zip(xr, yr, [v for v in n_trials if v is not None]):
@@ -60,15 +69,15 @@ for xi, yi, n in zip(xr, yr, [v for v in n_trials if v is not None]):
 
 for xi, note in zip(x, annotations):
     ax.annotate(note, (xi, 0), textcoords="offset points", xytext=(0, -95),
-                ha="center", fontsize=7.6, color="#444444", linespacing=1.3)
+                ha="center", fontsize=7.4, color="#444444", linespacing=1.3)
 
 ax.set_xticks(x)
-ax.set_xticklabels(labels, fontsize=9)
+ax.set_xticklabels(labels, fontsize=8.7)
 ax.tick_params(axis="x", pad=14)
 ax.set_xlim(-0.5, len(x) - 0.4)
 ax.set_ylim(0, 100)
 ax.set_ylabel("RoboTwin full-50-task Clean success rate (%)", fontsize=11)
-ax.set_title("Full project history -- RoboTwin canonical metric, exp0013 -> exp0017", fontsize=14, fontweight="bold", pad=16)
+ax.set_title("Full project history -- RoboTwin canonical metric, exp0013 -> exp0017 cont7", fontsize=14, fontweight="bold", pad=16)
 ax.spines[["top", "right"]].set_visible(False)
 ax.grid(axis="y", color="#eeeeee", linewidth=0.8, zorder=0)
 
