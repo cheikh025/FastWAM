@@ -1,0 +1,46 @@
+# @package _global_
+#
+# exp0017 cont11: continuing the extension pattern. cont10's completion (cumulative
+# step ~90,740) resolved cont9's flat reading as noise, not a plateau: full-50-task
+# RoboTwin Clean mean rose 52.0% -> 54.8% (+2.8), the same recovery pattern seen
+# after cont6's earlier flat reading. 43/50 tasks nonzero. Also produced this
+# project's first-ever Randomized-phase measurement (53.2%, n=5) -- very close to
+# the Clean result (54.8%), a positive sign since the goal requires both phases to
+# independently clear 90%. LIBERO remains rock-solid: 97.5% overall (Spatial 98.0%,
+# Object 100.0%, Goal 96.0%, Long 96.0%).
+#
+# Growth-rate trend across the last seven checks: +9.6, +9.6, +0.4, +3.2, +6.0,
+# +0.0, +2.8 -- noisy but net positive, no confirmed ceiling. No basis to change
+# strategy.
+#
+# max_steps=90000 (this phase's own schedule) resumed via directory (full-state)
+# resume from cont10's own step_080000 (global_step=80000) -- the scheduler
+# rebuilds for the new, larger max_steps and fast-forwards to global_step=80000
+# (88.9% through the new schedule), reopening the LR to continue exploring rather
+# than staying decayed near-zero from cont10's own now-completed schedule.
+#
+# Everything else unchanged (data mixing, full backbone, LR, batch_size).
+
+defaults:
+  - override /data: multiembodiment_libero_robotwin_long_protected
+  - override /model: fastwam_multiembodiment
+  - _self_
+
+batch_size: 3
+num_workers: 4
+gradient_accumulation_steps: 4
+
+model:
+  mot_checkpoint_mixed_attn: true
+
+lr_scheduler_type: "cosine"
+learning_rate: 3e-5
+num_epochs: 1
+max_steps: 90000
+log_every: 10
+save_every: 500
+eval_every: 999999
+save_full_state: true
+
+weight_decay: 1e-2
+resume: ./runs/multiembodiment_libero_robotwin_disjoint_offset_release_parent_full_backbone_long_protected_longrun_cont10_3e-5/2026-09-01_21-36-24/checkpoints/state/step_080000
