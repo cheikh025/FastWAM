@@ -14,22 +14,25 @@ import matplotlib.pyplot as plt
 OUT = "/workspace/FastWAM/research/progress/summary_report"
 
 labels = [
-    "exp0013\n(full backbone, unprotected)",
-    "exp0014\nstep 2600 (frozen backbone)",
-    "exp0014\nstep 4600 (frozen backbone)",
-    "exp0015\n(frozen, RoboTwin-heavy 1:3)",
-    "exp0016\nphase 1, step 1000 (low-LR)",
+    "exp0013\n(full, unprotected)",
+    "exp0014\nstep 2600 (frozen)",
+    "exp0014\nstep 4600 (frozen)",
+    "exp0015\n(frozen, 1:3 ratio)",
+    "exp0016\nstep 1000 (low-LR)",
     "exp0017 cont3\nstep ~19,740",
     "exp0017 cont4\nstep ~30,740",
     "exp0017 cont5\nstep ~40,740",
     "exp0017 cont6\nstep ~50,740",
     "exp0017 cont7\nstep ~60,740",
+    "exp0017 cont8\nstep ~70,740",
+    "exp0017 cont9\nstep ~80,740",
+    "exp0017 cont10\nstep ~90,740",
 ]
 x = list(range(len(labels)))
 
 # Full-50-task Clean mean -- None where no full-50-task scan was ever run
-full50 = [None, 12.6, 11.6, 11.6, 9.6, 23.2, 32.8, 42.4, 42.8, 46.0]
-n_trials = [None, 10, 5, 5, 5, 5, 5, 5, 5, 5]
+full50 = [None, 12.6, 11.6, 11.6, 9.6, 23.2, 32.8, 42.4, 42.8, 46.0, 52.0, 52.0, 54.8]
+n_trials = [None, 10, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
 
 annotations = [
     "curated 2-task panel only\n(click_alarmclock 80%,\nturn_switch 60% -> 0%)\ncollapsed before a full-50-\ntask scan could run",
@@ -40,11 +43,14 @@ annotations = [
     "full backbone unfrozen +\nLong-protected mixing --\nnearly DOUBLE any prior\ncandidate; 3/10 bimanual\ntasks nonzero",
     "8/10 bimanual tasks\nnonzero (was 3/10);\nLIBERO still 94-96%",
     "9/10 bimanual tasks\nnonzero; full 4-suite\nLIBERO check: 97.5%\noverall",
-    "first non-accelerating\nreading (+0.4 vs +9.6\ntwice); place_dual_shoes\nfinally nonzero -- 10/10\nbimanual tasks proven",
-    "+3.2 -- resolves cont6's\nflat reading as noise, not\na plateau; LIBERO 97.5%\noverall (strongest yet)",
+    "first non-accelerating\nreading; place_dual_shoes\nfinally nonzero -- 10/10\nbimanual tasks proven",
+    "+3.2 -- resolves cont6's\nflat reading as noise,\nnot a plateau",
+    "+6.0 -- crosses 50% for\nthe first time",
+    "flat again (+0.0), but all\n10 bimanual tasks nonzero\nsimultaneously first time",
+    "+2.8 -- confirms cont9 was\nnoise too; first Randomized\nmeasurement: 53.2%, close\nto Clean",
 ]
 
-fig, ax = plt.subplots(figsize=(18.5, 7.5))
+fig, ax = plt.subplots(figsize=(27, 7.5))
 
 ax.axhline(90, color="#c0392b", linestyle="--", linewidth=1.3, zorder=1)
 ax.text(0.99, 91.3, "90% target", color="#c0392b", fontsize=10, ha="right", transform=ax.get_yaxis_transform())
@@ -72,12 +78,12 @@ for xi, note in zip(x, annotations):
                 ha="center", fontsize=7.4, color="#444444", linespacing=1.3)
 
 ax.set_xticks(x)
-ax.set_xticklabels(labels, fontsize=8.7)
+ax.set_xticklabels(labels, fontsize=8.6)
 ax.tick_params(axis="x", pad=14)
 ax.set_xlim(-0.5, len(x) - 0.4)
 ax.set_ylim(0, 100)
 ax.set_ylabel("RoboTwin full-50-task Clean success rate (%)", fontsize=11)
-ax.set_title("Full project history -- RoboTwin canonical metric, exp0013 -> exp0017 cont7", fontsize=14, fontweight="bold", pad=16)
+ax.set_title("Full project history -- RoboTwin canonical metric, exp0013 -> exp0017 cont10", fontsize=14, fontweight="bold", pad=16)
 ax.spines[["top", "right"]].set_visible(False)
 ax.grid(axis="y", color="#eeeeee", linewidth=0.8, zorder=0)
 
